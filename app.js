@@ -46,7 +46,13 @@ function saveLocal() {
 function showScreen(id) {
   document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
   document.getElementById(id).classList.add("active");
-  if (id === "screen-login") { renderEmpGrid(); pinBuffer = ""; selectedEmpKey = null; }
+  if (id === "screen-login") {
+    renderEmpGrid();
+    pinBuffer = "";
+    selectedEmpKey = null;
+    const s = document.getElementById("emp-search");
+    if (s) { s.value = ""; }
+  }
   if (id === "screen-app") renderAll();
 }
 
@@ -54,34 +60,115 @@ const AVATAR_COLORS = [["#e6eef9","#0047BB"],["#e6f4ed","#1a7a4a"],["#fff0e8","#
 function initials(n) { return (n||"?").split(" ").map(x=>x[0]).join("").toUpperCase().slice(0,2); }
 function avatarStyle(i) { const c=AVATAR_COLORS[i%AVATAR_COLORS.length]; return `background:${c[0]};color:${c[1]}`; }
 
-function renderEmpGrid() {
+function renderEmpGrid(filter = "") {
   const g = document.getElementById("emp-grid");
   if (!g) return;
-  if (!employees.length) { g.innerHTML='<div style="font-size:13px;color:var(--text2);grid-column:1/-1;text-align:center;padding:1rem">No employees yet. Use Admin access to add employees.</div>'; return; }
-  g.innerHTML = employees.map((e,i) => {
+  const q = filter.toLowerCase().trim();
+  const filtered = employees.filter(e =>
+    !q || e.name.toLowerCase().includes(q) || e.empId.toLowerCase().includes(q) || e.area.toLowerCase().includes(q)
+  );
+  if (!employees.length) {
+    g.innerHTML = '<div class="emp-empty">No employees yet.<br>Use Admin access to add employees.</div>';
+    return;
+  }
+  if (!filtered.length) {
+    g.innerHTML = '<div class="emp-empty">No employees match your search.</div>';
+    return;
+  }
+  g.innerHTML = filtered.map((e) => {
+    const i = employees.indexOf(e);
     const active = getClockedInEntry(e.key);
-    const done = clockEntries.find(en => en.empKey===e.key && en.date===today() && en.timeOut);
-    return `<button class="emp-btn" onclick="selectEmployee('${e.key}')">
-      <div class="emp-avatar" style="${avatarStyle(i)};width:44px;height:44px;font-size:16px">${initials(e.name)}</div>
-      <div class="emp-btn-name">${e.name}</div>
-      <div class="emp-btn-area">${e.area}</div>
-      <div style="margin-top:4px">${active?'<span class="badge badge-green" style="font-size:11px">● Clocked in</span>':done?'<span class="badge badge-gray" style="font-size:11px">✓ Done</span>':'<span class="badge badge-amber" style="font-size:11px">○ Not in</span>'}</div>
-    </button>`;
+    const done = clockEntries.find(en => en.empKey === e.key && en.date === today() && en.timeOut);
+    const statusBadge = active
+      ? '<span class="badge badge-green" style="font-size:11px">● Clocked in</span>'
+      : done
+      ? '<span class="badge badge-gray" style="font-size:11px">✓ Done</span>'
+      : '<span class="badge badge-amber" style="font-size:11px">○ Not in</span>';
+    return `<div class="emp-list-item" onclick="selectEmployee('${e.key}')">
+      <div class="emp-avatar" style="${avatarStyle(i)};width:40px;height:40px;font-size:14px;flex-shrink:0">${initials(e.name)}</div>
+      <div class="emp-item-info">
+        <div class="emp-item-name">${highlight(e.name, q)}</div>
+        <div class="emp-item-meta">${e.empId} · ${e.area} · ${e.startTime}–${e.endTime}</div>
+      </div>
+      <div class="emp-item-status">${statusBadge}</div>
+    </div>`;
   }).join("");
+}
+
+function highlight(text, q) {
+  if (!q) return text;
+  const idx = text.toLowerCase().indexOf(q);
+  if (idx === -1) return text;
+  return text.slice(0, idx) + `<mark style="background:#fff0c0;border-radius:2px;padding:0 1px">${text.slice(idx, idx + q.length)}</mark>` + text.slice(idx + q.length);
+}
+
+function filterEmpList() {
+  const q = document.getElementById("emp-search")?.value || "";
+  renderEmpGrid(q);
 }
 
 function selectEmployee(key) {
   selectedEmpKey = key;
-  const emp = employees.find(e=>e.key===key), i = employees.indexOf(emp);
+  const emp = employees.find(e => e.key === key);
+
+  // Check if already clocked in
+  const active = getClockedInEntry(key);
+  if (active) {
+    document.getElementById("warning-message").innerHTML =
+      `<strong>${emp.name}</strong> is already clocked in since <strong>${active.timeIn}</strong>.<br><br>
+      If you continue, you will be clocking <strong>out</strong>.`;
+    document.getElementById("clockin-warning-modal").classList.add("open");
+    return;
+  }
+
+  // Check if already completed a shift today
+  const done = clockEntries.find(e => e.empKey === key && e.date === today() && e.timeOut);
+  if (done) {
+    document.getElementById("done-message").innerHTML =
+      `<strong>${emp.name}</strong> has already completed a shift today.<br><br>
+      <strong>Clocked in:</strong> ${done.timeIn}<br>
+      <strong>Clocked out:</strong> ${done.timeOut}<br>
+      <strong>Total hours:</strong> ${calcHours(done.timeIn, done.timeOut)?.toFixed(1) || "—"}h<br><br>
+      Do you need to clock in again for a second shift?`;
+    document.getElementById("done-warning-modal").classList.add("open");
+    return;
+  }
+
+  openPinScreen();
+}
+
+function openPinScreen() {
+  const emp = employees.find(e => e.key === selectedEmpKey);
+  const i = employees.indexOf(emp);
   document.getElementById("pin-name").textContent = emp.name;
   document.getElementById("pin-area").textContent = `${emp.area} · ${emp.startTime}–${emp.endTime}`;
   const av = document.getElementById("pin-avatar");
-  av.style.cssText = avatarStyle(i)+";width:60px;height:60px;font-size:22px;font-weight:700;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto .75rem";
+  av.style.cssText = avatarStyle(i) + ";width:60px;height:60px;font-size:22px;font-weight:700;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto .75rem";
   av.textContent = initials(emp.name);
   pinBuffer = "";
   updatePinDots("pin-dots", 0, "");
   document.getElementById("pin-error").textContent = "";
   showScreen("screen-pin");
+}
+
+function proceedToPin() {
+  document.getElementById("clockin-warning-modal").classList.remove("open");
+  openPinScreen();
+}
+
+function closeWarningModal() {
+  document.getElementById("clockin-warning-modal").classList.remove("open");
+  selectedEmpKey = null;
+}
+
+function proceedToPinForce() {
+  document.getElementById("done-warning-modal").classList.remove("open");
+  openPinScreen();
+}
+
+function closeDoneModal() {
+  document.getElementById("done-warning-modal").classList.remove("open");
+  selectedEmpKey = null;
 }
 
 function updatePinDots(id, len, state) {
@@ -196,29 +283,20 @@ function performClockAction(empKey) {
     saveLocal();
     const hrs = calcHours(clockEntries[idx].timeIn, timeStamp);
     area.innerHTML = `<div style="text-align:center;padding:.5rem">
-      <div style="font-size:40px;margin-bottom:.5rem">👋</div>
+      <div style="font-size:48px;margin-bottom:.5rem">👋</div>
       <div style="font-size:20px;font-weight:700;color:var(--igt-blue);margin-bottom:.25rem">See you, ${emp.name.split(" ")[0]}!</div>
       <div style="font-size:14px;color:var(--text2);margin-bottom:.25rem">Clocked out at <strong>${timeStamp}</strong></div>
-      <div style="font-size:13px;color:var(--text2);margin-bottom:1.25rem">Total time: <strong>${hrs!==null?hrs.toFixed(1)+"h":"—"}</strong></div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:1.25rem">Total time today: <strong>${hrs!==null?hrs.toFixed(1)+"h":"—"}</strong></div>
       <button class="btn btn-primary" onclick="showScreen('screen-login')">← Back to home</button>
     </div>`;
     toast(`${emp.name} clocked out at ${timeStamp}`,"success");
   } else {
-    const alreadyDone = clockEntries.find(e=>e.empKey===empKey&&e.date===today()&&e.timeOut);
-    if (alreadyDone) {
-      area.innerHTML = `<div style="text-align:center;padding:.5rem">
-        <div style="font-size:13px;color:var(--text2);margin-bottom:1rem">${emp.name} already completed a shift today (${alreadyDone.timeIn}–${alreadyDone.timeOut}).</div>
-        <button class="btn btn-primary" onclick="forceClockIn('${empKey}')">Clock in again</button>
-        <button class="btn" onclick="showScreen('screen-login')" style="margin-left:8px">← Back</button>
-      </div>`;
-      return;
-    }
     clockEntries.push({ empKey, date:today(), timeIn:timeStamp, timeOut:null, name:emp.name, area:emp.area, empId:emp.empId, stdStart:emp.startTime, stdEnd:emp.endTime, stdHours:emp.hours });
     saveLocal();
     const h = new Date().getHours();
     const greet = h<12?"morning":h<17?"afternoon":"evening";
     area.innerHTML = `<div style="text-align:center;padding:.5rem">
-      <div style="font-size:40px;margin-bottom:.5rem">✅</div>
+      <div style="font-size:48px;margin-bottom:.5rem">✅</div>
       <div style="font-size:20px;font-weight:700;color:var(--igt-blue);margin-bottom:.25rem">Good ${greet}, ${emp.name.split(" ")[0]}!</div>
       <div style="font-size:14px;color:var(--text2);margin-bottom:1.25rem">Clocked in at <strong>${timeStamp}</strong></div>
       <button class="btn btn-primary" onclick="showScreen('screen-login')">← Back to home</button>

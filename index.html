@@ -34,11 +34,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .login-divider{height:1px;background:var(--border);margin:.75rem 0 1.25rem}
 .login-title{font-size:17px;font-weight:700;color:var(--igt-blue);margin-bottom:.4rem}
 .login-desc{font-size:13px;color:var(--text2);margin-bottom:1.75rem;line-height:1.6}
-.emp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-bottom:1rem;text-align:left}
-.emp-btn{border:1.5px solid var(--border);border-radius:var(--radius);padding:12px;cursor:pointer;background:#fff;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:6px}
-.emp-btn:hover{border-color:var(--igt-blue);background:var(--igt-blue-light);box-shadow:0 2px 8px rgba(0,71,187,.1)}
-.emp-btn-name{font-size:13px;font-weight:600;color:var(--text);text-align:center}
-.emp-btn-area{font-size:11px;color:var(--text2);text-align:center}
+.search-wrap{position:relative;margin-bottom:10px}
+.search-wrap input{width:100%;padding:11px 14px 11px 40px;border:1.5px solid var(--border);border-radius:var(--radius);font-size:15px;background:#fff;color:var(--text);transition:border .15s}
+.search-wrap input:focus{outline:none;border-color:var(--igt-blue);box-shadow:0 0 0 3px rgba(0,71,187,.1)}
+.search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:16px;color:var(--text3);pointer-events:none}
+.emp-list-wrap{max-height:320px;overflow-y:auto;border-radius:var(--radius);border:1px solid var(--border);background:#fff;margin-bottom:.75rem}
+.emp-list-item{display:flex;align-items:center;gap:12px;padding:11px 14px;cursor:pointer;border-bottom:1px solid #f0f2f8;transition:background .12s}
+.emp-list-item:last-child{border-bottom:none}
+.emp-list-item:hover{background:var(--igt-blue-light)}
+.emp-list-item:active{background:#d0dff5}
+.emp-item-info{flex:1;min-width:0}
+.emp-item-name{font-size:14px;font-weight:600;color:var(--text)}
+.emp-item-meta{font-size:12px;color:var(--text2);margin-top:1px}
+.emp-item-status{flex-shrink:0}
+.emp-empty{text-align:center;padding:1.5rem;color:var(--text3);font-size:13px}
 .admin-link{margin-top:1.25rem;font-size:12px;color:var(--text3);cursor:pointer;text-decoration:underline}
 .login-footer{margin-top:1rem;font-size:11px;color:var(--text3);line-height:1.5}
 
@@ -167,7 +176,11 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--text3);border
     <div class="login-divider"></div>
     <div class="login-title">Employee Attendance System</div>
     <div class="login-desc">Select your name to clock in or out.</div>
-    <div class="emp-grid" id="emp-grid"></div>
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="emp-search" placeholder="Search by name or employee ID…" oninput="filterEmpList()" autocomplete="off" autocorrect="off" spellcheck="false"/>
+    </div>
+    <div class="emp-list-wrap" id="emp-grid"></div>
     <div class="admin-link" onclick="showAdminLogin()">⚙ Admin access</div>
     <div class="login-footer">IGT APAC Manufacturing Operations</div>
   </div>
@@ -327,6 +340,32 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--text3);border
     <div class="actions">
       <button class="btn" onclick="closeEmpModal()">Cancel</button>
       <button class="btn btn-primary" onclick="saveEmployee()">✓ Save Employee</button>
+    </div>
+  </div>
+</div>
+
+<!-- Already clocked in warning modal -->
+<div class="modal-overlay" id="clockin-warning-modal">
+  <div class="modal" style="max-width:360px;text-align:center">
+    <div style="font-size:48px;margin-bottom:.75rem">⚠️</div>
+    <div class="modal-title" style="text-align:center;border-bottom:none;padding-bottom:0;font-size:18px" id="warning-title">Already Clocked In</div>
+    <div style="font-size:14px;color:var(--text2);margin:.75rem 0 1.25rem;line-height:1.6" id="warning-message"></div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn btn-primary" style="justify-content:center;width:100%" onclick="proceedToPin()">Continue to PIN — Clock Out</button>
+      <button class="btn" style="justify-content:center;width:100%" onclick="closeWarningModal()">← Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- Already completed shift warning modal -->
+<div class="modal-overlay" id="done-warning-modal">
+  <div class="modal" style="max-width:360px;text-align:center">
+    <div style="font-size:48px;margin-bottom:.75rem">✅</div>
+    <div class="modal-title" style="text-align:center;border-bottom:none;padding-bottom:0;font-size:18px">Shift Already Completed</div>
+    <div style="font-size:14px;color:var(--text2);margin:.75rem 0 1.25rem;line-height:1.6" id="done-message"></div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn btn-primary" style="justify-content:center;width:100%" onclick="proceedToPinForce()">Clock In Again Anyway</button>
+      <button class="btn" style="justify-content:center;width:100%" onclick="closeDoneModal()">← Back</button>
     </div>
   </div>
 </div>
