@@ -4,8 +4,8 @@
   "description": "IGT APAC Manufacturing Operations — Employee Time Tracking System",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#003087",
-  "theme_color": "#003087",
+  "background_color": "#0047BB",
+  "theme_color": "#0047BB",
   "orientation": "any",
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
