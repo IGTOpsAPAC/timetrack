@@ -698,6 +698,7 @@ function renderSchedulesList() {
           <div style="font-weight:700;font-size:14px">${s.name} <span style="font-weight:400;color:var(--text2);font-size:12px">&lt;${s.email}&gt;</span>
             ${s.active ? '<span class="badge badge-green" style="font-size:11px;margin-left:6px">● Active</span>' : '<span class="badge badge-gray" style="font-size:11px;margin-left:6px">Paused</span>'}
           </div>
+          ${s.subject ? `<div style="font-size:12px;font-weight:600;color:var(--igt-blue);margin-top:2px">📧 ${s.subject}</div>` : ""}
           <div style="font-size:12px;color:var(--text2);margin-top:3px">⏰ ${s.time} · ${days}</div>
           <div style="font-size:12px;color:var(--text2);margin-top:2px">📂 ${areas} · 👤 ${empType}</div>
         </div>
@@ -720,9 +721,10 @@ function openScheduleModal(idx) {
     ? areas.map(a => `<label style="text-transform:none;font-size:13px;display:flex;align-items:center;gap:4px;font-weight:400"><input type="checkbox" class="sch-area-cb" value="${a}" ${s?.areas?.includes(a)?"checked":""}> ${a}</label>`).join("")
     : '<div style="font-size:12px;color:var(--text2)">Save work areas in settings first</div>';
 
-  document.getElementById("sch-name").value  = s?.name  || "";
-  document.getElementById("sch-email").value = s?.email || "";
-  document.getElementById("sch-time").value  = s?.time  || "17:30";
+  document.getElementById("sch-name").value    = s?.name    || "";
+  document.getElementById("sch-email").value   = s?.email   || "";
+  document.getElementById("sch-subject").value = s?.subject || "";
+  document.getElementById("sch-time").value    = s?.time    || "17:30";
   document.getElementById("sch-emptype").value = s?.empType || "all";
   document.getElementById("sch-active").value  = s?.active !== false ? "1" : "0";
   DAY_IDS.forEach(d => { document.getElementById("sch-"+d).checked = s ? s.days.includes(d) : ["mon","tue","wed","thu","fri"].includes(d); });
@@ -736,19 +738,20 @@ function closeScheduleModal() {
 }
 
 function saveSchedule() {
-  const name  = document.getElementById("sch-name").value.trim();
-  const email = document.getElementById("sch-email").value.trim();
-  const time  = document.getElementById("sch-time").value;
+  const name    = document.getElementById("sch-name").value.trim();
+  const email   = document.getElementById("sch-email").value.trim();
+  const subject = document.getElementById("sch-subject").value.trim();
+  const time    = document.getElementById("sch-time").value;
   if (!name)  { toast("Recipient name required","error"); return; }
   if (!email) { toast("Recipient email required","error"); return; }
   const days = DAY_IDS.filter(d => document.getElementById("sch-"+d).checked);
   if (!days.length) { toast("Select at least one day","error"); return; }
-  const areas = [...document.querySelectorAll(".sch-area-cb:checked")].map(cb => cb.value);
+  const areas   = [...document.querySelectorAll(".sch-area-cb:checked")].map(cb => cb.value);
   const empType = document.getElementById("sch-emptype").value;
   const active  = document.getElementById("sch-active").value === "1";
 
   const schedules = getSchedules();
-  const entry = { key: "s"+Date.now(), name, email, time, days, areas, empType, active };
+  const entry = { key:"s"+Date.now(), name, email, subject, time, days, areas, empType, active };
   if (editingScheduleKey !== null) schedules[editingScheduleKey] = { ...schedules[editingScheduleKey], ...entry };
   else schedules.push(entry);
   saveSchedules(schedules);
@@ -790,12 +793,14 @@ function runScheduledExport(s) {
 
   if (!entries.length) return;
 
+  const reportTitle = s.subject || `${settings.company||"IGT"} Daily Timesheet Report`;
   const areaLabel = s.areas?.length ? s.areas.join("+") : "AllAreas";
   const typeLabel = s.empType === "all" ? "" : "_" + s.empType;
-  const filename  = `IGT_Timesheet_${dateVal}_${areaLabel}${typeLabel}_for_${s.name.replace(/\s+/g,"_")}.xlsx`;
+  const safeName  = (s.subject || s.name).replace(/[^a-zA-Z0-9 _-]/g,"").replace(/\s+/g,"_");
+  const filename  = `${safeName}_${dateVal}.xlsx`;
 
   const wsData = [
-    [`${settings.company||"IGT"} — Daily Timesheet Report`,"","","","","","","","","","","",""],
+    [reportTitle, "", "", "", "", "", "", "", "", "", "", "", ""],
     [`Date: ${dateVal}`,"","Report for:",`${s.name} <${s.email}>`,"","Areas:",s.areas?.length?s.areas.join(", "):"All","Staff:",s.empType==="permanent"?"Permanent only":s.empType==="contractor"?"Contractors only":"All","","",""],
     [],
     ["Employee","Employee ID","Area","Status","Std Start","Actual In","Start Var","Std End","Actual Out","End Var","Std Hrs","Net Hrs","Diff","Result"],

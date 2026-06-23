@@ -382,6 +382,11 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--text3);border
     <div class="form-row"><label>Recipient name</label><input type="text" id="sch-name" placeholder="e.g. Operations Manager"/></div>
     <div class="form-row"><label>Recipient email</label><input type="email" id="sch-email" placeholder="manager@igt.com"/></div>
     <div class="form-row">
+      <label>Email subject</label>
+      <input type="text" id="sch-subject" placeholder="e.g. IGT Daily Attendance Report — Gaming Assembly"/>
+      <div style="font-size:11px;color:var(--text2);margin-top:4px">Used as the Excel filename and report header. Date is appended automatically.</div>
+    </div>
+    <div class="form-row">
       <label>Send time (daily)</label>
       <input type="time" id="sch-time" value="17:30"/>
       <div style="font-size:11px;color:var(--text2);margin-top:4px">Report will be generated and downloaded at this time each day</div>
