@@ -990,21 +990,43 @@ let faceDetecting = false;
 let faceDescriptors = [];
 let enrollStream = null;
 
-const FACE_MODELS_URL = "https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights";
+const FACE_MODELS_URL = "https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights";
+const FACE_MODELS_URL_FALLBACK = "https://unpkg.com/face-api.js@0.22.2/weights";
 const FACE_MATCH_THRESHOLD = 0.5;
 
 async function loadFaceApi() {
   if (faceApiLoaded) return true;
+  // Wait for face-api.js script to load (up to 10s)
+  for (let i = 0; i < 20; i++) {
+    if (typeof faceapi !== "undefined") break;
+    await new Promise(r => setTimeout(r, 500));
+  }
+  if (typeof faceapi === "undefined") {
+    console.error("face-api.js not loaded");
+    return false;
+  }
   try {
     setFaceStatus("Loading Face ID models…", "scanning");
-    await Promise.all([
-      faceapi.nets.tinyFaceDetector.loadFromUri(FACE_MODELS_URL),
-      faceapi.nets.faceLandmark68TinyNet.loadFromUri(FACE_MODELS_URL),
-      faceapi.nets.faceRecognitionNet.loadFromUri(FACE_MODELS_URL),
-    ]);
+    // Try primary CDN first, fallback if needed
+    try {
+      await Promise.all([
+        faceapi.nets.tinyFaceDetector.loadFromUri(FACE_MODELS_URL),
+        faceapi.nets.faceLandmark68TinyNet.loadFromUri(FACE_MODELS_URL),
+        faceapi.nets.faceRecognitionNet.loadFromUri(FACE_MODELS_URL),
+      ]);
+    } catch(e) {
+      await Promise.all([
+        faceapi.nets.tinyFaceDetector.loadFromUri(FACE_MODELS_URL_FALLBACK),
+        faceapi.nets.faceLandmark68TinyNet.loadFromUri(FACE_MODELS_URL_FALLBACK),
+        faceapi.nets.faceRecognitionNet.loadFromUri(FACE_MODELS_URL_FALLBACK),
+      ]);
+    }
     faceApiLoaded = true;
     return true;
-  } catch(e) { console.error("Face API load error:", e); return false; }
+  } catch(e) {
+    console.error("Face API model load error:", e);
+    return false;
+  }
 }
 
 function setFaceStatus(msg, type) {
