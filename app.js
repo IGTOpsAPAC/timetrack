@@ -983,6 +983,194 @@ function showScreen(id) {
   if (id === "screen-app") renderAll();
 }
 
+// ── Version History ───────────────────────────────────────────
+const APP_VERSION = "DV17";
+const VERSION_HISTORY = [
+  {
+    version: "DV17",
+    date: "2026-06-25",
+    status: "current",
+    changes: [
+      "Fixed face detection — added camera warm-up delay and video ready check",
+      "Improved face matching with live confidence percentage display",
+      "Added 30-second timeout for face scanning with helpful fallback message",
+      "Fixed face descriptor loading from localStorage (array/object format)",
+      "Added version number to home screen and version history page",
+    ]
+  },
+  {
+    version: "DV16",
+    date: "2026-06-24",
+    changes: [
+      "Face ID: loosened match threshold to 0.6 for better recognition",
+      "Face ID: lowered face detection score threshold to 0.3",
+      "Added live match percentage display during face scanning",
+      "Fixed ZXing barcode scanner loading issue",
+      "IGT logo now displays correctly in header (removed filter)",
+    ]
+  },
+  {
+    version: "DV15",
+    date: "2026-06-24",
+    changes: [
+      "Fixed IGT logo display in header — removed CSS filter that made it invisible",
+      "Logo now shows full colour in nav bar",
+    ]
+  },
+  {
+    version: "DV14",
+    date: "2026-06-24",
+    changes: [
+      "Face API: switched to more reliable CDN with automatic fallback",
+      "Face API: added script load wait logic before attempting to use models",
+    ]
+  },
+  {
+    version: "DV13",
+    date: "2026-06-24",
+    changes: [
+      "Added Face ID login — enroll face in Admin, scan to clock in/out",
+      "Face enrollment with camera capture in employee edit modal",
+      "Face ID shows ✅ badge on enrolled employees in admin list",
+      "Fixed admin navigation button selector causing access failure",
+      "Face ID stops automatically when leaving login screen",
+    ]
+  },
+  {
+    version: "DV12",
+    date: "2026-06-24",
+    changes: [
+      "Fixed QR code generation — switched to qrcodejs library",
+      "QR codes now generate correctly in Print Barcodes modal",
+    ]
+  },
+  {
+    version: "DV11",
+    date: "2026-06-24",
+    changes: [
+      "Fixed admin access broken by duplicate showScreen function",
+      "ZXing barcode library loads asynchronously to prevent blocking app",
+      "Barcode scanner checks if ZXing loaded before attempting to scan",
+    ]
+  },
+  {
+    version: "DV10",
+    date: "2026-06-24",
+    changes: [
+      "Fixed admin access — nav button found by onclick attribute not position",
+      "ZXing library now loads safely without blocking app if unavailable",
+    ]
+  },
+  {
+    version: "DV9",
+    date: "2026-06-24",
+    changes: [
+      "Added QR code barcode scanning on home screen",
+      "Print Barcodes feature in Admin — generates QR card for each employee",
+      "Scan beep sound on successful recognition",
+      "Back camera preferred for barcode scanning",
+      "Print layout optimised for ID card printing",
+    ]
+  },
+  {
+    version: "DV8",
+    date: "2026-06-23",
+    changes: [
+      "Integrated Power Automate webhook for email delivery",
+      "Scheduled reports now email Excel file as attachment",
+      "Fallback to local download if email fails",
+      "Added Send Now button on each schedule for immediate testing",
+    ]
+  },
+  {
+    version: "DV7",
+    date: "2026-06-23",
+    changes: [
+      "Added email subject field to report schedules",
+      "Subject used as Excel filename and report header",
+      "Subject displayed on schedule cards in admin panel",
+    ]
+  },
+  {
+    version: "DV6",
+    date: "2026-06-23",
+    changes: [
+      "Updated default work areas: Gaming Assembly, Fintech Assembly, Repair Centre, Warehouse, Operations Support",
+      "Work areas updated across employee modal, settings, and import",
+    ]
+  },
+  {
+    version: "DV5",
+    date: "2026-06-23",
+    changes: [
+      "Home screen shows search only — no employee names visible until typed",
+      "Lunch break deducted from total hours (per employee or default setting)",
+      "Scheduled timesheet reports — multiple recipients, area/staff type filters",
+      "Report schedule: choose days, time, areas, permanent/contractor/all",
+    ]
+  },
+  {
+    version: "DV4",
+    date: "2026-06-23",
+    changes: [
+      "Excel mass import of employees from spreadsheet",
+      "Import validates missing fields, duplicates, and unparseable shift times",
+      "Preview screen shows new vs overwrite before confirming",
+      "Auto-generates Employee IDs from names if not provided",
+    ]
+  },
+  {
+    version: "DV3",
+    date: "2026-06-23",
+    changes: [
+      "Added popup warning if employee already clocked in",
+      "Added popup warning if employee already completed a shift today",
+      "Both warnings appear before PIN pad — option to proceed or go back",
+    ]
+  },
+  {
+    version: "DV2",
+    date: "2026-06-23",
+    changes: [
+      "Replaced employee tile grid with search-by-name list",
+      "Search highlights matching text in results",
+      "Employee list shows clock-in status badges",
+    ]
+  },
+  {
+    version: "DV1",
+    date: "2026-06-22",
+    changes: [
+      "Initial release — PIN-based employee clock in/out",
+      "IGT branding with full colour logo",
+      "Admin panel: employee management, settings, report schedules",
+      "Daily timesheet report with Excel export",
+      "Clock in/out with time variance vs standard hours",
+      "Today's attendance table with live status",
+    ]
+  },
+];
+
+function showVersionHistory() {
+  const list = document.getElementById("version-list");
+  list.innerHTML = VERSION_HISTORY.map(v => `
+    <div style="margin-bottom:1rem;padding:1rem;border-radius:var(--radius);border:1px solid var(--border);${v.status==="current"?"border-color:var(--igt-blue);background:var(--igt-blue-light)":"background:#fff"}">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:.5rem">
+        <span style="font-weight:700;font-size:15px;color:var(--igt-blue)">${v.version}</span>
+        ${v.status==="current"?'<span class="badge badge-blue" style="font-size:11px">● Current</span>':""}
+        <span style="font-size:12px;color:var(--text2);margin-left:auto">${v.date}</span>
+      </div>
+      <ul style="padding-left:1.25rem;margin:0">
+        ${v.changes.map(c=>`<li style="font-size:13px;color:var(--text);margin-bottom:3px">${c}</li>`).join("")}
+      </ul>
+    </div>`).join("");
+  document.getElementById("version-modal").classList.add("open");
+}
+
+function closeVersionModal() {
+  document.getElementById("version-modal").classList.remove("open");
+}
+
 // ── Face ID ───────────────────────────────────────────────────
 let faceApiLoaded = false;
 let faceStream = null;
@@ -1075,29 +1263,41 @@ async function startFaceId() {
     return;
   }
   btn.disabled = true;
-  setFaceStatus("Loading Face ID…", "scanning");
+  setFaceStatus("Loading Face ID models…", "scanning");
   const loaded = await loadFaceApi();
   if (!loaded) {
-    setFaceStatus("Face ID unavailable. Use barcode or search instead.", "error");
+    setFaceStatus("Face ID unavailable — use barcode or search instead.", "error");
     btn.disabled = false;
     setTimeout(() => setFaceStatus("", ""), 3000);
     return;
   }
   try {
-    faceStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode:"user", width:320, height:240 } });
+    faceStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } }
+    });
     const video = document.getElementById("face-video");
     video.srcObject = faceStream;
+
+    // Wait for video to be truly ready
+    await new Promise((resolve) => {
+      video.onloadedmetadata = () => { video.play(); resolve(); };
+      setTimeout(resolve, 3000); // fallback
+    });
+    // Extra delay for camera to warm up
+    await new Promise(r => setTimeout(r, 1500));
+
     wrap.style.display = "block";
     stopBtn.style.display = "block";
     setFaceStatus("🔍 Looking for your face…", "scanning");
     faceDetecting = true;
     buildFaceDescriptors();
+    console.log("Face descriptors built:", faceDescriptors.length);
 
-    // Auto-stop after 30 seconds with helpful message
+    // Auto-stop after 30 seconds
     setTimeout(() => {
       if (faceDetecting) {
         faceDetecting = false;
-        setFaceStatus("⏱ Face not recognised after 30s — try re-enrolling in Admin or use PIN/search", "error");
+        setFaceStatus("⏱ Not recognised — try re-enrolling in better lighting or use PIN/search", "error");
         stopFaceId();
       }
     }, 30000);
@@ -1113,8 +1313,16 @@ async function startFaceId() {
 async function detectFaceLoop(video) {
   if (!faceDetecting) return;
   try {
+    // Ensure video is playing and has dimensions
+    if (video.videoWidth === 0 || video.paused) {
+      setFaceStatus("⏳ Waiting for camera…", "scanning");
+      if (faceDetecting) setTimeout(() => detectFaceLoop(video), 500);
+      return;
+    }
+
+    const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.3 });
     const detection = await faceapi
-      .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.3 }))
+      .detectSingleFace(video, options)
       .withFaceLandmarks(true)
       .withFaceDescriptor();
 
@@ -1123,35 +1331,35 @@ async function detectFaceLoop(video) {
         let bestMatch = null, bestDist = Infinity;
         faceDescriptors.forEach(fd => {
           const dist = faceapi.euclideanDistance(detection.descriptor, fd.descriptor);
+          console.log(`Distance to ${employees.find(e=>e.key===fd.empKey)?.name}: ${dist.toFixed(3)}`);
           if (dist < bestDist) { bestDist = dist; bestMatch = fd; }
         });
 
-        // Show live distance so we can debug threshold
         const pct = Math.round((1 - Math.min(bestDist, 1)) * 100);
-        const emp = employees.find(e => e.key === bestMatch?.empKey);
-        setFaceStatus(`🔍 Matching… ${pct}% — ${emp?.name || "unknown"}`, "scanning");
+        const matchEmp = employees.find(e => e.key === bestMatch?.empKey);
+        setFaceStatus(`🔍 Matching… ${pct}% confidence — ${matchEmp?.name}`, "scanning");
 
         if (bestDist < FACE_MATCH_THRESHOLD && bestMatch) {
-          setFaceStatus(`✅ Recognised: ${emp?.name}`, "success");
+          setFaceStatus(`✅ Recognised: ${matchEmp?.name}!`, "success");
           faceDetecting = false;
           playBeep();
           setTimeout(() => {
             stopFaceId();
             selectEmployee(bestMatch.empKey);
-          }, 800);
+          }, 1000);
           return;
         }
       } else {
-        setFaceStatus("🔍 Face detected but no faces enrolled", "scanning");
+        setFaceStatus("⚠ Face detected but no enrolled faces found", "error");
       }
     } else {
       setFaceStatus("🔍 No face detected — look straight at the camera", "scanning");
     }
   } catch(e) {
     console.error("Face detection error:", e);
-    setFaceStatus("⚠ Detection error: " + e.message, "error");
+    setFaceStatus("⚠ Error: " + e.message, "error");
   }
-  if (faceDetecting) setTimeout(() => detectFaceLoop(video), 400);
+  if (faceDetecting) setTimeout(() => detectFaceLoop(video), 500);
 }
 
 function stopFaceId() {

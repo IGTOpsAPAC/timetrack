@@ -251,7 +251,10 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--text3);border
     </div>
     <div id="emp-grid"></div>
     <div class="admin-link" onclick="showAdminLogin()">⚙ Admin access</div>
-    <div class="login-footer">IGT APAC Manufacturing Operations</div>
+    <div class="login-footer">
+      IGT APAC Manufacturing Operations<br>
+      <span onclick="showVersionHistory()" style="cursor:pointer;text-decoration:underline;color:var(--text3)">v DV17</span>
+    </div>
   </div>
 </div>
 
@@ -562,6 +565,16 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--text3);border
       <button class="btn btn-primary" style="justify-content:center;width:100%" onclick="proceedToPinForce()">Clock In Again Anyway</button>
       <button class="btn" style="justify-content:center;width:100%" onclick="closeDoneModal()">← Back</button>
     </div>
+  </div>
+</div>
+
+<!-- Version history modal -->
+<div class="modal-overlay" id="version-modal" style="align-items:flex-start;padding:1.5rem;overflow-y:auto">
+  <div class="modal" style="width:600px;max-width:100%;margin:auto">
+    <div class="modal-title">📋 Version History</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:1rem">IGT TimeTrack — APAC Manufacturing Operations</div>
+    <div id="version-list"></div>
+    <div class="actions"><button class="btn btn-primary" onclick="closeVersionModal()">Close</button></div>
   </div>
 </div>
 
