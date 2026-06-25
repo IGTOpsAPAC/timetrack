@@ -251,10 +251,7 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--text3);border
     </div>
     <div id="emp-grid"></div>
     <div class="admin-link" onclick="showAdminLogin()">⚙ Admin access</div>
-    <div class="login-footer">
-      IGT APAC Manufacturing Operations<br>
-      <span onclick="showVersionHistory()" style="cursor:pointer;text-decoration:underline;color:var(--text3)">v DV17</span>
-    </div>
+    <div class="login-footer">IGT APAC Manufacturing Operations</div>
   </div>
 </div>
 
@@ -399,6 +396,14 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--text3);border
             <div style="font-size:12px;color:var(--text2);margin-bottom:.75rem">Configure automatic daily timesheet emails. Add multiple recipients — each can receive reports for specific areas and staff types.</div>
             <div id="report-schedules-list"></div>
             <button class="btn btn-primary" style="margin-top:.5rem" onclick="openScheduleModal()">+ Add Report Schedule</button>
+          </div>
+          <div class="card" style="margin-top:1rem">
+            <div class="card-section-header">📋 Version History</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
+              <div style="font-size:13px;color:var(--text2)">Current: <strong style="color:var(--igt-blue)">DV17</strong></div>
+              <button class="btn btn-primary" style="padding:6px 14px;font-size:12px" onclick="showVersionHistory()">View all versions</button>
+            </div>
+            <div id="version-latest"></div>
           </div>
         </div>
       </div>

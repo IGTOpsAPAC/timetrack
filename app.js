@@ -307,7 +307,15 @@ function forceClockIn(empKey) {
   saveLocal(); performClockAction(empKey);
 }
 
-function renderAll() { renderTodayTable(); renderActiveBanner(); renderEmpList(); loadSettingsForm(); renderReportRecipient(); genReport(); }
+function renderAll() {
+  renderTodayTable();
+  renderActiveBanner();
+  renderEmpList();
+  loadSettingsForm();
+  renderReportRecipient();
+  genReport();
+  renderLatestVersion();
+}
 
 function renderActiveBanner() {
   const active=clockEntries.filter(e=>e.date===today()&&e.timeIn&&!e.timeOut);
@@ -1150,6 +1158,17 @@ const VERSION_HISTORY = [
     ]
   },
 ];
+
+function renderLatestVersion() {
+  const el = document.getElementById("version-latest");
+  if (!el) return;
+  const latest = VERSION_HISTORY[0];
+  el.innerHTML = `<div style="font-size:12px;color:var(--text2);margin-bottom:4px">${latest.date} — What's new in ${latest.version}:</div>
+    <ul style="padding-left:1.25rem;margin:0">
+      ${latest.changes.slice(0,3).map(c=>`<li style="font-size:12px;color:var(--text);margin-bottom:2px">${c}</li>`).join("")}
+      ${latest.changes.length > 3 ? `<li style="font-size:12px;color:var(--text2)">+${latest.changes.length-3} more…</li>` : ""}
+    </ul>`;
+}
 
 function showVersionHistory() {
   const list = document.getElementById("version-list");
