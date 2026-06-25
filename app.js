@@ -783,7 +783,131 @@ function checkSchedules() {
   });
 }
 
-// ── Power Automate Webhook ────────────────────────────────────
+// ── Barcode Scanner ───────────────────────────────────────────
+let codeReader = null;
+let scannerActive = false;
+
+async function startScanner() {
+  const wrap = document.getElementById("scanner-wrap");
+  const stopBtn = document.getElementById("stop-scan-btn");
+  const video = document.getElementById("scanner-video");
+
+  if (scannerActive) return;
+
+  try {
+    // Check camera permission
+    await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+
+    wrap.style.display = "block";
+    stopBtn.style.display = "block";
+    scannerActive = true;
+
+    codeReader = new ZXing.BrowserQRCodeReader();
+    const devices = await ZXing.BrowserCodeReader.listVideoInputDevices();
+
+    // Prefer back camera
+    const backCamera = devices.find(d => d.label.toLowerCase().includes("back") || d.label.toLowerCase().includes("rear") || d.label.toLowerCase().includes("environment"));
+    const deviceId = backCamera ? backCamera.deviceId : (devices[0]?.deviceId);
+
+    codeReader.decodeFromVideoDevice(deviceId, video, (result, err) => {
+      if (result) {
+        const text = result.getText();
+        handleBarcodeScan(text);
+      }
+    });
+  } catch(e) {
+    toast("Camera not available: " + e.message, "error");
+    stopScanner();
+  }
+}
+
+function stopScanner() {
+  if (codeReader) {
+    codeReader.reset();
+    codeReader = null;
+  }
+  scannerActive = false;
+  document.getElementById("scanner-wrap").style.display = "none";
+  document.getElementById("stop-scan-btn").style.display = "none";
+}
+
+function handleBarcodeScan(text) {
+  // QR code contains employee key prefixed with "IGT-EMP:"
+  stopScanner();
+  if (!text.startsWith("IGT-EMP:")) {
+    toast("Invalid barcode — not an IGT employee code", "error");
+    return;
+  }
+  const empKey = text.replace("IGT-EMP:", "");
+  const emp = employees.find(e => e.key === empKey);
+  if (!emp) {
+    toast("Employee not found — barcode may be outdated", "error");
+    return;
+  }
+  // Success — beep and proceed
+  playBeep();
+  selectEmployee(empKey);
+}
+
+function playBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 880;
+    osc.type = "sine";
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.15);
+  } catch(e) {}
+}
+
+// ── QR Code / Barcode Generation ─────────────────────────────
+async function showBarcodes() {
+  const grid = document.getElementById("barcode-grid");
+  grid.innerHTML = '<div style="font-size:13px;color:var(--text2)">Generating barcodes…</div>';
+  document.getElementById("barcode-modal").classList.add("open");
+
+  // Generate QR codes for all employees
+  const cards = await Promise.all(employees.map(async (emp, i) => {
+    const qrData = `IGT-EMP:${emp.key}`;
+    try {
+      const dataUrl = await QRCode.toDataURL(qrData, {
+        width: 140,
+        margin: 1,
+        color: { dark: "#003087", light: "#ffffff" },
+        errorCorrectionLevel: "M",
+      });
+      return `<div class="qr-card">
+        <img src="${dataUrl}" alt="QR Code for ${emp.name}" style="width:120px;height:120px"/>
+        <div class="qr-card-name">${emp.name}</div>
+        <div class="qr-card-area">${emp.area}</div>
+        <div class="qr-card-id">${emp.empId}</div>
+        <div style="font-size:9px;color:var(--text3);margin-top:4px;font-family:monospace">IGT TimeTrack</div>
+      </div>`;
+    } catch(e) {
+      return `<div class="qr-card"><div style="font-size:12px;color:var(--text2)">Error generating QR for ${emp.name}</div></div>`;
+    }
+  }));
+
+  grid.innerHTML = cards.join("");
+}
+
+function closeBarcodesModal() {
+  document.getElementById("barcode-modal").classList.remove("open");
+}
+
+// Stop scanner when leaving login screen
+const _origShowScreen = showScreen;
+function showScreen(id) {
+  if (id !== "screen-login") stopScanner();
+  _origShowScreen(id);
+}
+
+// ── Boot ──────────────────────────────────────────────────────
 const POWER_AUTOMATE_URL = "https://default3c259ff8b3a9490ca23979b422db62.eb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/1f48e40d38724395b4aa9ed093b3af68/triggers/manual/paths/invoke?api-version=1";
 
 async function runScheduledExport(s) {
