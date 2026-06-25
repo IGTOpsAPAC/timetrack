@@ -43,18 +43,6 @@ function saveLocal() {
   localStorage.setItem("tt_settings", JSON.stringify(settings));
 }
 
-function showScreen(id) {
-  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
-  document.getElementById(id).classList.add("active");
-  if (id === "screen-login") {
-    renderEmpGrid();
-    pinBuffer = "";
-    selectedEmpKey = null;
-    const s = document.getElementById("emp-search");
-    if (s) { s.value = ""; }
-  }
-  if (id === "screen-app") renderAll();
-}
 
 const AVATAR_COLORS = [["#e6eef9","#0047BB"],["#e6f4ed","#1a7a4a"],["#fff0e8","#c0390b"],["#fff3e0","#e65100"],["#f3e8ff","#6b21a8"],["#e0f2fe","#0369a1"]];
 function initials(n) { return (n||"?").split(" ").map(x=>x[0]).join("").toUpperCase().slice(0,2); }
@@ -238,11 +226,13 @@ function verifyAdminPin() {
   if (adminPinBuffer === (settings.adminPin||"0000")) {
     closeAdminModal();
     isAdminUnlocked = true;
-    document.querySelectorAll(".admin-only").forEach(el=>el.style.display="");
-    document.getElementById("admin-signout-btn").style.display="";
+    document.querySelectorAll(".admin-only").forEach(el => el.style.display = "");
+    document.getElementById("admin-signout-btn").style.display = "";
     showScreen("screen-app");
-    showSection("admin", document.querySelectorAll(".nav-btn")[2]);
-    toast("Admin access granted","success");
+    // Find admin nav button by its onclick attribute
+    const adminBtn = [...document.querySelectorAll(".nav-btn")].find(b => b.getAttribute("onclick")?.includes("admin"));
+    showSection("admin", adminBtn);
+    toast("Admin access granted", "success");
   } else {
     adminPinBuffer = "";
     updatePinDots("admin-pin-dots", 4, "error");
@@ -794,19 +784,25 @@ async function startScanner() {
 
   if (scannerActive) return;
 
-  try {
-    // Check camera permission
-    await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+  // Check ZXing loaded
+  if (typeof ZXing === "undefined") {
+    toast("Scanner library not loaded. Try refreshing the page.", "error");
+    return;
+  }
 
+  try {
+    await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
     wrap.style.display = "block";
     stopBtn.style.display = "block";
     scannerActive = true;
 
     codeReader = new ZXing.BrowserQRCodeReader();
     const devices = await ZXing.BrowserCodeReader.listVideoInputDevices();
-
-    // Prefer back camera
-    const backCamera = devices.find(d => d.label.toLowerCase().includes("back") || d.label.toLowerCase().includes("rear") || d.label.toLowerCase().includes("environment"));
+    const backCamera = devices.find(d =>
+      d.label.toLowerCase().includes("back") ||
+      d.label.toLowerCase().includes("rear") ||
+      d.label.toLowerCase().includes("environment")
+    );
     const deviceId = backCamera ? backCamera.deviceId : (devices[0]?.deviceId);
 
     codeReader.decodeFromVideoDevice(deviceId, video, (result, err) => {
@@ -901,10 +897,18 @@ function closeBarcodesModal() {
 }
 
 // Stop scanner when leaving login screen
-const _origShowScreen = showScreen;
 function showScreen(id) {
   if (id !== "screen-login") stopScanner();
-  _origShowScreen(id);
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  if (id === "screen-login") {
+    renderEmpGrid();
+    pinBuffer = "";
+    selectedEmpKey = null;
+    const s = document.getElementById("emp-search");
+    if (s) { s.value = ""; }
+  }
+  if (id === "screen-app") renderAll();
 }
 
 // ── Boot ──────────────────────────────────────────────────────

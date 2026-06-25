@@ -555,7 +555,15 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--text3);border
 <div class="toast" id="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js"></script>
+<script>
+// Load ZXing safely — don't block app if it fails
+(function(){
+  var s = document.createElement('script');
+  s.src = 'https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js';
+  s.onerror = function(){ console.warn('ZXing scanner library failed to load — barcode scanning unavailable'); };
+  document.head.appendChild(s);
+})();
+</script>
 <script src="app.js"></script>
 <script>
 function updateStrip(){
