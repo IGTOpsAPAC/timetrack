@@ -418,7 +418,7 @@ function renderEmpList() {
   el.innerHTML=employees.map((e,i)=>`<div class="card" style="margin-bottom:8px;padding:1rem"><div style="display:flex;align-items:center;gap:10px">
     <div class="emp-avatar" style="${avatarStyle(i)}">${initials(e.name)}</div>
     <div style="flex:1"><div style="font-weight:700;font-size:14px">${e.name} <span class="tag">${e.empId}</span></div>
-    <div style="font-size:12px;color:var(--text2)">${e.area} · ${e.startTime}–${e.endTime} · ${e.hours}h/day · PIN: ${"●".repeat(e.pin?.length||4)}</div></div>
+    <div style="font-size:12px;color:var(--text2)">${e.area} · ${e.startTime}–${e.endTime} · ${e.hours}h/day · PIN: ${"●".repeat(e.pin?.length||4)}${e.faceDescriptor?' · <span style="color:#1a7a4a;font-weight:600">✅ Face</span>':''}</div></div>
     <div style="display:flex;gap:6px">
       <button class="btn" onclick="openEmpModal('${e.key}')" style="padding:6px 10px">✏</button>
       <button class="btn btn-danger" onclick="deleteEmp('${e.key}')" style="padding:6px 10px">🗑</button>
@@ -430,8 +430,40 @@ function openEmpModal(key) {
   editingEmpKey=key||null;
   const areas=(settings.areas||"Gaming Assembly,Fintech Assembly,Repair Centre,Warehouse,Operations Support").split(",").map(a=>a.trim());
   document.getElementById("emp-area").innerHTML=areas.map(a=>`<option>${a}</option>`).join("");
-  if(key){const e=employees.find(x=>x.key===key);document.getElementById("modal-title").textContent="Edit Employee";document.getElementById("emp-name").value=e.name;document.getElementById("emp-id-field").value=e.empId;document.getElementById("emp-area").value=e.area;document.getElementById("emp-start").value=e.startTime;document.getElementById("emp-end").value=e.endTime;document.getElementById("emp-hours").value=e.hours;document.getElementById("emp-pin").value=e.pin||"";document.getElementById("emp-lunch").value=e.lunchMins||30;}
-  else{document.getElementById("modal-title").textContent="Add Employee";["emp-name","emp-id-field","emp-pin"].forEach(id=>document.getElementById(id).value="");document.getElementById("emp-start").value="09:00";document.getElementById("emp-end").value="17:00";document.getElementById("emp-hours").value="8";document.getElementById("emp-lunch").value=settings.defaultLunch||30;}
+  window._pendingFaceDescriptor = null;
+  window._clearFaceDescriptor = false;
+  stopFaceEnroll();
+  const captureBtn = document.getElementById("enroll-capture-btn");
+  if (captureBtn) captureBtn.style.display = "none";
+  document.getElementById("enroll-msg").textContent = "";
+
+  if(key){
+    const e=employees.find(x=>x.key===key);
+    document.getElementById("modal-title").textContent="Edit Employee";
+    document.getElementById("emp-name").value=e.name;
+    document.getElementById("emp-id-field").value=e.empId;
+    document.getElementById("emp-area").value=e.area;
+    document.getElementById("emp-start").value=e.startTime;
+    document.getElementById("emp-end").value=e.endTime;
+    document.getElementById("emp-hours").value=e.hours;
+    document.getElementById("emp-pin").value=e.pin||"";
+    document.getElementById("emp-lunch").value=e.lunchMins||30;
+    // Show face enroll status
+    const hasFace = !!e.faceDescriptor;
+    document.getElementById("enroll-status-badge").innerHTML = hasFace
+      ? '<span class="face-enrolled-badge">✅ Face enrolled</span>'
+      : '<span style="font-size:12px;color:var(--text2)">No face enrolled</span>';
+    document.getElementById("enroll-clear-btn").style.display = hasFace ? "" : "none";
+  } else {
+    document.getElementById("modal-title").textContent="Add Employee";
+    ["emp-name","emp-id-field","emp-pin"].forEach(id=>document.getElementById(id).value="");
+    document.getElementById("emp-start").value="09:00";
+    document.getElementById("emp-end").value="17:00";
+    document.getElementById("emp-hours").value="8";
+    document.getElementById("emp-lunch").value=settings.defaultLunch||30;
+    document.getElementById("enroll-status-badge").innerHTML = '<span style="font-size:12px;color:var(--text2)">No face enrolled</span>';
+    document.getElementById("enroll-clear-btn").style.display = "none";
+  }
   document.getElementById("emp-modal").classList.add("open");
 }
 
@@ -446,8 +478,18 @@ function saveEmployee() {
   const status=document.getElementById("emp-status-field")?.value||"Permanent";
   if(!name||!empId){toast("Name and ID required","error");return;}
   if(!/^\d{4}$/.test(pin)){toast("PIN must be exactly 4 digits","error");return;}
-  if(editingEmpKey){const idx=employees.findIndex(e=>e.key===editingEmpKey);employees[idx]={...employees[idx],name,empId,area,startTime,endTime,hours,pin,lunchMins,status};}
-  else employees.push({key:"e"+Date.now(),name,empId,area,startTime,endTime,hours,pin,lunchMins,status});
+  const emp = { key: editingEmpKey ? employees.find(e=>e.key===editingEmpKey).key : "e"+Date.now(), name, empId, area, startTime, endTime, hours, pin, lunchMins, status };
+  // Handle face descriptor
+  if (window._pendingFaceDescriptor) emp.faceDescriptor = window._pendingFaceDescriptor;
+  else if (!window._clearFaceDescriptor && editingEmpKey) {
+    const existing = employees.find(e=>e.key===editingEmpKey);
+    if (existing?.faceDescriptor) emp.faceDescriptor = existing.faceDescriptor;
+  }
+  window._pendingFaceDescriptor = null;
+  window._clearFaceDescriptor = false;
+
+  if(editingEmpKey){ const idx=employees.findIndex(e=>e.key===editingEmpKey); employees[idx]=emp; }
+  else employees.push(emp);
   saveLocal();closeEmpModal();renderEmpList();renderEmpGrid();
   toast(editingEmpKey?"Employee updated":"Employee added","success");
 }
@@ -928,7 +970,7 @@ function closeBarcodesModal() {
 
 // Stop scanner when leaving login screen
 function showScreen(id) {
-  if (id !== "screen-login") stopScanner();
+  if (id !== "screen-login") { stopScanner(); stopFaceId(); }
   document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
   document.getElementById(id).classList.add("active");
   if (id === "screen-login") {
@@ -939,6 +981,210 @@ function showScreen(id) {
     if (s) { s.value = ""; }
   }
   if (id === "screen-app") renderAll();
+}
+
+// ── Face ID ───────────────────────────────────────────────────
+let faceApiLoaded = false;
+let faceStream = null;
+let faceDetecting = false;
+let faceDescriptors = [];
+let enrollStream = null;
+
+const FACE_MODELS_URL = "https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/weights";
+const FACE_MATCH_THRESHOLD = 0.5;
+
+async function loadFaceApi() {
+  if (faceApiLoaded) return true;
+  try {
+    setFaceStatus("Loading Face ID models…", "scanning");
+    await Promise.all([
+      faceapi.nets.tinyFaceDetector.loadFromUri(FACE_MODELS_URL),
+      faceapi.nets.faceLandmark68TinyNet.loadFromUri(FACE_MODELS_URL),
+      faceapi.nets.faceRecognitionNet.loadFromUri(FACE_MODELS_URL),
+    ]);
+    faceApiLoaded = true;
+    return true;
+  } catch(e) { console.error("Face API load error:", e); return false; }
+}
+
+function setFaceStatus(msg, type) {
+  const el = document.getElementById("face-status");
+  if (!el) return;
+  el.textContent = msg;
+  el.className = `face-status ${type}`;
+  el.style.display = msg ? "block" : "none";
+}
+
+function buildFaceDescriptors() {
+  faceDescriptors = [];
+  employees.forEach(emp => {
+    if (emp.faceDescriptor) {
+      try {
+        const arr = new Float32Array(Object.values(emp.faceDescriptor));
+        faceDescriptors.push({ empKey: emp.key, descriptor: arr });
+      } catch(e) {}
+    }
+  });
+}
+
+async function startFaceId() {
+  const btn = document.getElementById("faceid-btn");
+  const wrap = document.getElementById("face-scanner-wrap");
+  const stopBtn = document.getElementById("stop-face-btn");
+  const enrolled = employees.filter(e => e.faceDescriptor);
+  if (!enrolled.length) {
+    setFaceStatus("No faces enrolled yet. Ask admin to enroll employee faces first.", "error");
+    setTimeout(() => setFaceStatus("", ""), 3000);
+    return;
+  }
+  btn.disabled = true;
+  setFaceStatus("Loading Face ID…", "scanning");
+  const loaded = await loadFaceApi();
+  if (!loaded) {
+    setFaceStatus("Face ID unavailable. Use barcode or search instead.", "error");
+    btn.disabled = false;
+    setTimeout(() => setFaceStatus("", ""), 3000);
+    return;
+  }
+  try {
+    faceStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode:"user", width:320, height:240 } });
+    const video = document.getElementById("face-video");
+    video.srcObject = faceStream;
+    wrap.style.display = "block";
+    stopBtn.style.display = "block";
+    setFaceStatus("🔍 Looking for your face…", "scanning");
+    faceDetecting = true;
+    buildFaceDescriptors();
+    detectFaceLoop(video);
+  } catch(e) {
+    setFaceStatus("Camera unavailable: " + e.message, "error");
+    btn.disabled = false;
+    setTimeout(() => setFaceStatus("", ""), 3000);
+  }
+}
+
+async function detectFaceLoop(video) {
+  if (!faceDetecting) return;
+  try {
+    const detection = await faceapi
+      .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ scoreThreshold:0.5 }))
+      .withFaceLandmarks(true)
+      .withFaceDescriptor();
+    if (detection && faceDescriptors.length) {
+      let bestMatch = null, bestDist = Infinity;
+      faceDescriptors.forEach(fd => {
+        const dist = faceapi.euclideanDistance(detection.descriptor, fd.descriptor);
+        if (dist < bestDist) { bestDist = dist; bestMatch = fd; }
+      });
+      if (bestDist < FACE_MATCH_THRESHOLD && bestMatch) {
+        const emp = employees.find(e => e.key === bestMatch.empKey);
+        setFaceStatus(`✅ Recognised: ${emp?.name}`, "success");
+        faceDetecting = false;
+        playBeep();
+        stopFaceId();
+        setTimeout(() => selectEmployee(bestMatch.empKey), 600);
+        return;
+      } else {
+        setFaceStatus("🔍 Face detected — matching…", "scanning");
+      }
+    } else {
+      setFaceStatus("🔍 Looking for your face…", "scanning");
+    }
+  } catch(e) {}
+  if (faceDetecting) setTimeout(() => detectFaceLoop(video), 300);
+}
+
+function stopFaceId() {
+  faceDetecting = false;
+  if (faceStream) { faceStream.getTracks().forEach(t => t.stop()); faceStream = null; }
+  const wrap = document.getElementById("face-scanner-wrap");
+  const stopBtn = document.getElementById("stop-face-btn");
+  const btn = document.getElementById("faceid-btn");
+  if (wrap) wrap.style.display = "none";
+  if (stopBtn) stopBtn.style.display = "none";
+  if (btn) btn.disabled = false;
+  const video = document.getElementById("face-video");
+  if (video) video.srcObject = null;
+  setTimeout(() => setFaceStatus("", ""), 2000);
+}
+
+// ── Face Enroll ───────────────────────────────────────────────
+async function startFaceEnroll() {
+  const wrap = document.getElementById("enroll-video-wrap");
+  const msg = document.getElementById("enroll-msg");
+  const btn = document.getElementById("enroll-start-btn");
+  msg.textContent = "Loading Face ID models…";
+  btn.disabled = true;
+  const loaded = await loadFaceApi();
+  if (!loaded) {
+    msg.textContent = "Face API failed to load. Check your internet connection.";
+    btn.disabled = false;
+    return;
+  }
+  try {
+    enrollStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode:"user", width:320, height:240 } });
+    const video = document.getElementById("enroll-video");
+    video.srcObject = enrollStream;
+    wrap.style.display = "block";
+    msg.textContent = "Position face in camera then click Capture.";
+    let captureBtn = document.getElementById("enroll-capture-btn");
+    if (!captureBtn) {
+      captureBtn = document.createElement("button");
+      captureBtn.id = "enroll-capture-btn";
+      captureBtn.type = "button";
+      captureBtn.className = "btn btn-primary";
+      captureBtn.style.marginTop = "8px";
+      captureBtn.textContent = "📸 Capture Face";
+      captureBtn.onclick = captureFaceEnroll;
+      wrap.after(captureBtn);
+    }
+    captureBtn.style.display = "";
+    btn.disabled = false;
+  } catch(e) {
+    msg.textContent = "Camera unavailable: " + e.message;
+    btn.disabled = false;
+  }
+}
+
+async function captureFaceEnroll() {
+  const video = document.getElementById("enroll-video");
+  const msg = document.getElementById("enroll-msg");
+  const captureBtn = document.getElementById("enroll-capture-btn");
+  msg.textContent = "Detecting face…";
+  try {
+    const detection = await faceapi
+      .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ scoreThreshold:0.5 }))
+      .withFaceLandmarks(true)
+      .withFaceDescriptor();
+    if (!detection) {
+      msg.textContent = "No face detected. Make sure your face is clearly visible and try again.";
+      return;
+    }
+    window._pendingFaceDescriptor = Array.from(detection.descriptor);
+    window._clearFaceDescriptor = false;
+    msg.textContent = "✅ Face captured! Click Save Employee to confirm.";
+    document.getElementById("enroll-status-badge").innerHTML = '<span class="face-enrolled-badge">✅ Face captured — save to confirm</span>';
+    document.getElementById("enroll-clear-btn").style.display = "";
+    stopFaceEnroll();
+    if (captureBtn) captureBtn.style.display = "none";
+  } catch(e) {
+    msg.textContent = "Error capturing face: " + e.message;
+  }
+}
+
+function stopFaceEnroll() {
+  if (enrollStream) { enrollStream.getTracks().forEach(t => t.stop()); enrollStream = null; }
+  const wrap = document.getElementById("enroll-video-wrap");
+  if (wrap) wrap.style.display = "none";
+}
+
+function clearFaceEnroll() {
+  window._pendingFaceDescriptor = null;
+  window._clearFaceDescriptor = true;
+  document.getElementById("enroll-status-badge").innerHTML = '<span style="font-size:12px;color:var(--text2)">Face removed — save to confirm</span>';
+  document.getElementById("enroll-msg").textContent = "";
+  document.getElementById("enroll-clear-btn").style.display = "none";
+  stopFaceEnroll();
 }
 
 // ── Boot ──────────────────────────────────────────────────────
