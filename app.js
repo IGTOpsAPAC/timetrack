@@ -864,32 +864,62 @@ function playBeep() {
 // ── QR Code / Barcode Generation ─────────────────────────────
 async function showBarcodes() {
   const grid = document.getElementById("barcode-grid");
-  grid.innerHTML = '<div style="font-size:13px;color:var(--text2)">Generating barcodes…</div>';
+  grid.innerHTML = "";
   document.getElementById("barcode-modal").classList.add("open");
 
-  // Generate QR codes for all employees
-  const cards = await Promise.all(employees.map(async (emp, i) => {
-    const qrData = `IGT-EMP:${emp.key}`;
-    try {
-      const dataUrl = await QRCode.toDataURL(qrData, {
-        width: 140,
-        margin: 1,
-        color: { dark: "#003087", light: "#ffffff" },
-        errorCorrectionLevel: "M",
-      });
-      return `<div class="qr-card">
-        <img src="${dataUrl}" alt="QR Code for ${emp.name}" style="width:120px;height:120px"/>
-        <div class="qr-card-name">${emp.name}</div>
-        <div class="qr-card-area">${emp.area}</div>
-        <div class="qr-card-id">${emp.empId}</div>
-        <div style="font-size:9px;color:var(--text3);margin-top:4px;font-family:monospace">IGT TimeTrack</div>
-      </div>`;
-    } catch(e) {
-      return `<div class="qr-card"><div style="font-size:12px;color:var(--text2)">Error generating QR for ${emp.name}</div></div>`;
-    }
-  }));
+  // Small delay to let modal render
+  await new Promise(r => setTimeout(r, 100));
 
-  grid.innerHTML = cards.join("");
+  if (!employees.length) {
+    grid.innerHTML = '<div style="font-size:13px;color:var(--text2)">No employees found. Add employees first.</div>';
+    return;
+  }
+
+  employees.forEach((emp) => {
+    const card = document.createElement("div");
+    card.className = "qr-card";
+
+    const qrWrap = document.createElement("div");
+    qrWrap.style.cssText = "width:120px;height:120px;margin:0 auto";
+    card.appendChild(qrWrap);
+
+    const nameEl = document.createElement("div");
+    nameEl.className = "qr-card-name";
+    nameEl.textContent = emp.name;
+    card.appendChild(nameEl);
+
+    const areaEl = document.createElement("div");
+    areaEl.className = "qr-card-area";
+    areaEl.textContent = emp.area;
+    card.appendChild(areaEl);
+
+    const idEl = document.createElement("div");
+    idEl.className = "qr-card-id";
+    idEl.textContent = emp.empId;
+    card.appendChild(idEl);
+
+    const brandEl = document.createElement("div");
+    brandEl.style.cssText = "font-size:9px;color:var(--text3);margin-top:4px;font-family:monospace";
+    brandEl.textContent = "IGT TimeTrack";
+    card.appendChild(brandEl);
+
+    grid.appendChild(card);
+
+    // Generate QR code into the div
+    try {
+      new QRCode(qrWrap, {
+        text: `IGT-EMP:${emp.key}`,
+        width: 120,
+        height: 120,
+        colorDark: "#003087",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.M,
+      });
+    } catch(e) {
+      qrWrap.innerHTML = `<div style="font-size:11px;color:red;padding:10px">QR error</div>`;
+      console.error("QR error for", emp.name, e);
+    }
+  });
 }
 
 function closeBarcodesModal() {
