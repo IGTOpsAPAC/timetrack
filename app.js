@@ -17,9 +17,8 @@ function init() {
   window.addEventListener("offline", updateOnlineStatus);
   // Start auto-save
   startAutoSave();
-  // Apply feature toggles
-  applyFeatureToggles();
-  initToggleListeners();
+  // Apply feature toggles after DOM ready
+  setTimeout(() => { applyFeatureToggles(); initToggleListeners(); }, 100);
   // Sync employees from SharePoint on load
   syncEmployeesFromSharePoint(true);
   // Init SharePoint sync
@@ -249,8 +248,11 @@ function verifyAdminPin() {
     isAdminUnlocked = true;
     document.querySelectorAll(".admin-only").forEach(el => el.style.display = "");
     document.getElementById("admin-signout-btn").style.display = "";
-    showScreen("screen-app");
-    // Find admin nav button by its onclick attribute
+    // Show app screen without triggering renderAll yet
+    document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+    document.getElementById("screen-app").classList.add("active");
+    renderAll();
+    // Navigate to admin tab AFTER renderAll
     const adminBtn = [...document.querySelectorAll(".nav-btn")].find(b => b.getAttribute("onclick")?.includes("admin"));
     showSection("admin", adminBtn);
     toast("Admin access granted", "success");
@@ -1192,7 +1194,8 @@ function showScreen(id) {
     selectedEmpKey = null;
     const s = document.getElementById("emp-search");
     if (s) { s.value = ""; }
-    applyFeatureToggles();
+    // Delay to ensure DOM is fully rendered before applying toggles
+    setTimeout(() => applyFeatureToggles(), 50);
   }
   if (id === "screen-app") renderAll();
 }
@@ -1377,8 +1380,18 @@ function backupLog(msg) {
 }
 
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV31";
+const APP_VERSION = "DV32";
 const VERSION_HISTORY = [
+  {
+    version: "DV32",
+    date: "2026-08-03",
+    status: "current",
+    changes: [
+      "Fixed Face ID toggle — applies with delay after DOM fully rendered",
+      "Admin access now goes directly to Admin tab by default",
+      "Fixed admin navigation — renderAll no longer resets to Clock tab",
+    ]
+  },
   {
     version: "DV31",
     date: "2026-08-03",
