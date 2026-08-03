@@ -301,15 +301,22 @@ function performClockAction(empKey) {
     toast(`${emp.name} clocked in at ${timeStamp}`,"success");
   }
   renderTodayTable(); renderActiveBanner();
-  spAutoSync(); // auto push to SharePoint after every clock action
+  // Write to SharePoint Excel via Power Automate
+  const latestEntry = entry
+    ? clockEntries.find(e => e.empKey === empKey && e.date === today() && e.timeOut === timeStamp)
+    : clockEntries.find(e => e.empKey === empKey && e.date === today() && e.timeIn === timeStamp);
+  if (latestEntry) writeClockEntryToExcel(latestEntry);
   setTimeout(()=>showScreen("screen-login"), 4000);
 }
 
 function forceClockIn(empKey) {
-  const emp=employees.find(e=>e.key===empKey);
-  const t=new Date().toLocaleTimeString("en-AU",{hour:"2-digit",minute:"2-digit",hour12:false});
-  clockEntries.push({empKey,date:today(),timeIn:t,timeOut:null,name:emp.name,area:emp.area,empId:emp.empId,stdStart:emp.startTime,stdEnd:emp.endTime,stdHours:emp.hours,lunchMins:emp.lunchMins||settings.defaultLunch||30,status:emp.status||"Permanent"});
-  saveLocal(); performClockAction(empKey);
+  const emp = employees.find(e => e.key === empKey);
+  const t = new Date().toLocaleTimeString("en-AU", {hour:"2-digit", minute:"2-digit", hour12:false});
+  const newEntry = {empKey, date:today(), timeIn:t, timeOut:null, name:emp.name, area:emp.area, empId:emp.empId, stdStart:emp.startTime, stdEnd:emp.endTime, stdHours:emp.hours, lunchMins:emp.lunchMins||settings.defaultLunch||30, status:emp.status||"Permanent"};
+  clockEntries.push(newEntry);
+  saveLocal();
+  writeClockEntryToExcel(newEntry);
+  performClockAction(empKey);
 }
 
 function renderAll() {
@@ -1189,15 +1196,92 @@ function backupLog(msg) {
 }
 
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV21";
+const APP_VERSION = "DV27";
 const VERSION_HISTORY = [
+  {
+    version: "DV27",
+    date: "2026-08-03",
+    status: "current",
+    changes: [
+      "Moved back to GitHub Pages while Azure subscription is being migrated to Everi-TPASS",
+      "New URL: https://IGTOpsAPAC.github.io/timetrack",
+      "Power Automate Excel sync confirmed working on any PC without login",
+      "PIN-based clock in/out works on any computer without Microsoft login",
+      "SharePoint Excel sync via Power Automate — no Azure App Registration required",
+      "Microsoft login (SharePoint List sync) available once IT adds GitHub Pages redirect URI",
+    ]
+  },
+  {
+    version: "DV26",
+    date: "2026-07-29",
+    status: "current",
+    changes: [
+      "Azure App Registration approved by IT — IGT Australia Operations Time Track",
+      "Client ID: 5b60a9fe-a128-4703-9ee4-2349e4e67e0b",
+      "Tenant ID: 3c259ff8-b3a9-490c-a239-79b422db62eb",
+      "Microsoft 365 sign-in now works with IGT corporate accounts",
+      "Real-time SharePoint List sync now fully operational",
+      "All PCs share live attendance data via SharePoint",
+    ]
+  },
+  {
+    version: "DV25",
+    date: "2026-07-22",
+    status: "current",
+    changes: [
+      "Complete fresh deployment package — all files included",
+      "Fixed app.js binary corruption issue from previous uploads",
+      "Pipeline YAML included for Azure Static Web Apps auto-deploy",
+      "Admin access fixed — MSAL loads asynchronously",
+      "Power Automate Excel sync on every clock in/out",
+    ]
+  },
+  {
+    version: "DV24",
+    date: "2026-07-22",
+    status: "current",
+    changes: [
+      "Fixed admin access — MSAL library was blocking all JavaScript on load",
+      "MSAL now loads asynchronously and safely without blocking the app",
+      "App works fully without SharePoint sync if MSAL is unavailable",
+      "Admin PIN modal now opens correctly",
+      "Show all employees option added to home screen search",
+    ]
+  },
+  {
+    version: "DV23",
+    date: "2026-07-08",
+    status: "current",
+    changes: [
+      "Real-time SharePoint Excel sync via Power Automate",
+      "Every clock in/out instantly writes a row to Attendance.xlsx on SharePoint",
+      "Calculates and stores: start variance, end variance, net hours, difference, status",
+      "Works without Azure App Registration — uses Power Automate as middleware",
+      "Sync status shown in header — Synced / Offline / Sync failed",
+      "Falls back to local storage if Power Automate is unreachable",
+    ]
+  },
+  {
+    version: "DV22",
+    date: "2026-07-08",
+    status: "current",
+    changes: [
+      "Migrated from GitHub Pages to Azure Static Web Apps",
+      "New app URL: https://witty-water-063172f10.7.azurestaticapps.net",
+      "Azure DevOps repo: dev.azure.com/arvinjoya/DL_TimeTrack",
+      "Auto-deployment pipeline via Azure DevOps — commits auto-deploy",
+      "App now fully hosted within Microsoft Azure infrastructure",
+      "Redirect URI updated for Azure App Registration request to IT",
+      "Private repo possible — no longer requires public GitHub repo",
+    ]
+  },
   {
     version: "DV21",
     date: "2026-06-26",
     status: "current",
     changes: [
       "Moved to IGT's official GitHub organisation — IGTOpsAPAC",
-      "New app URL: https://IGTOpsAPAC.github.io/timetrack",
+      "New app URL: https://witty-water-063172f10.7.azurestaticapps.net",
       "App now owned by IGT organisation — stays with company",
       "Strengthens Azure App Registration approval request to IT",
       "Redirect URI updated to IGTOpsAPAC GitHub Pages domain",
@@ -1714,8 +1798,8 @@ function clearFaceEnroll() {
 
 // ── SharePoint List Sync Engine ───────────────────────────────
 const SP_SCOPES = ["Sites.ReadWrite.All", "Files.ReadWrite", "User.Read"];
-const SP_DEFAULT_CLIENT_ID = "d3590ed6-52b3-4102-aeff-aad2292ab01c";
-const APP_GITHUB_URL = "https://igtopsapac.github.io/timetrack";
+const SP_DEFAULT_CLIENT_ID = "5b60a9fe-a128-4703-9ee4-2349e4e67e0b"; // IGT Australia Operations Time Track
+const APP_GITHUB_URL = "https://IGTOpsAPAC.github.io/timetrack";
 let spMsal = null;
 let spToken = null;
 let spSiteId = null;
@@ -1731,25 +1815,38 @@ function getClientId() {
 
 async function initMsal() {
   if (spMsal) return spMsal;
-  spMsal = new msal.PublicClientApplication({
-    auth: {
-      clientId: getClientId(),
-      authority: "https://login.microsoftonline.com/common",
-      redirectUri: window.location.origin + window.location.pathname,
-      navigateToLoginRequestUrl: false,
-    },
-    cache: { cacheLocation: "localStorage", storeAuthStateInCookie: true },
-  });
-  await spMsal.initialize();
-  // Handle redirect
+  // Wait for MSAL to load (up to 5 seconds)
+  for (let i = 0; i < 10; i++) {
+    if (typeof msal !== "undefined" && msal !== null) break;
+    await new Promise(r => setTimeout(r, 500));
+  }
+  if (typeof msal === "undefined" || msal === null) {
+    console.warn("MSAL not available — SharePoint sync disabled");
+    return null;
+  }
   try {
-    const resp = await spMsal.handleRedirectPromise();
-    if (resp?.accessToken) {
-      spToken = resp.accessToken;
-      updateSpAuthStatus(true, resp.account?.name);
-    }
-  } catch(e) { console.error("MSAL redirect error:", e); }
-  return spMsal;
+    spMsal = new msal.PublicClientApplication({
+      auth: {
+        clientId: getClientId(),
+        authority: "https://login.microsoftonline.com/3c259ff8-b3a9-490c-a239-79b422db62eb",
+        redirectUri: "https://IGTOpsAPAC.github.io/timetrack",
+        navigateToLoginRequestUrl: false,
+      },
+      cache: { cacheLocation: "localStorage", storeAuthStateInCookie: true },
+    });
+    await spMsal.initialize();
+    try {
+      const resp = await spMsal.handleRedirectPromise();
+      if (resp?.accessToken) {
+        spToken = resp.accessToken;
+        updateSpAuthStatus(true, resp.account?.name);
+      }
+    } catch(e) { console.error("MSAL redirect error:", e); }
+    return spMsal;
+  } catch(e) {
+    console.error("MSAL init error:", e);
+    return null;
+  }
 }
 
 async function spSignIn() {
@@ -2054,6 +2151,59 @@ async function spPullAll(silent = false) {
   spSyncing = false;
 }
 
+// ── Power Automate — Write to SharePoint Excel ────────────────
+const PA_EXCEL_URL = "https://default3c259ff8b3a9490ca23979b422db62.eb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/bff81414b8ef4af683e7f907f576389c/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=QqzFgS4fbuNMcAq04YeQZUk3HSnIkQB1k3zqleTqZHo";
+
+async function writeClockEntryToExcel(entry) {
+  // Calculate variances for the record
+  const actual  = calcHours(entry.timeIn, entry.timeOut, entry.lunchMins);
+  const diff    = actual !== null ? +(actual - entry.stdHours).toFixed(2) : null;
+  const inVar   = timeDiffStr(entry.stdStart, entry.timeIn) || "";
+  const outVar  = entry.timeOut ? (timeDiffStr(entry.stdEnd, entry.timeOut) || "") : "";
+  const status  = entry.timeOut
+    ? (diff !== null && diff >= 0 ? "On time" : "Short hours")
+    : entry.timeIn ? "In progress" : "Absent";
+
+  const payload = {
+    action:     entry.timeOut ? "clockout" : "clockin",
+    empKey:     entry.empKey     || "",
+    empName:    entry.name       || "",
+    empId:      entry.empId      || "",
+    area:       entry.area       || "",
+    date:       entry.date       || "",
+    timeIn:     entry.timeIn     || "",
+    timeOut:    entry.timeOut    || "",
+    stdStart:   entry.stdStart   || "",
+    stdEnd:     entry.stdEnd     || "",
+    stdHours:   entry.stdHours   || 8,
+    lunchMins:  entry.lunchMins  || 0,
+    status:     entry.status     || "Permanent",
+    startVariance: inVar,
+    endVariance:   outVar,
+    netHours:      actual !== null ? +actual.toFixed(2) : 0,
+    difference:    diff !== null ? diff : 0,
+    attendanceStatus: status,
+  };
+
+  try {
+    const resp = await fetch(PA_EXCEL_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (resp.ok || resp.status === 202) {
+      console.log("[PA Excel] ✓ Written to SharePoint Excel:", entry.name, entry.timeIn || entry.timeOut);
+      setSyncStatus("Synced " + new Date().toLocaleTimeString("en-AU", { hour:"2-digit", minute:"2-digit" }));
+    } else {
+      console.warn("[PA Excel] ✗ Failed:", resp.status, await resp.text());
+      setSyncStatus("Sync failed");
+    }
+  } catch(e) {
+    console.warn("[PA Excel] ✗ Network error:", e.message);
+    setSyncStatus("Offline — saved locally");
+  }
+}
+
 // ── Auto-sync on clock in/out ─────────────────────────────────
 async function spAutoSync() {
   const token = await getSpToken();
@@ -2081,6 +2231,11 @@ function setSyncStatus(msg) {
 async function initSpSync() {
   try {
     const msalInst = await initMsal();
+    if (!msalInst) {
+      console.warn("SharePoint sync unavailable — MSAL not loaded");
+      updateSpAuthStatus(false);
+      return;
+    }
     const accounts = msalInst.getAllAccounts();
     if (accounts.length > 0) {
       updateSpAuthStatus(true, accounts[0].name);

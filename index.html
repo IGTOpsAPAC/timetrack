@@ -251,7 +251,7 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--text3);border
     </div>
     <div id="emp-grid"></div>
     <div class="admin-link" onclick="showAdminLogin()">⚙ Admin access</div>
-    <div class="login-footer">IGT APAC Manufacturing Operations · <strong>DV21</strong></div>
+    <div class="login-footer">IGT APAC Manufacturing Operations · <strong>DV27</strong></div>
   </div>
 </div>
 
@@ -676,7 +676,15 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--text3);border
 <div class="toast" id="toast"></div>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.10.0/lib/msal-browser.min.js"></script>
+<script>
+// Load MSAL safely — don't block app if it fails to load
+(function(){
+  var s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.10.0/lib/msal-browser.min.js';
+  s.onerror = function(){ console.warn('MSAL failed to load — SharePoint sync unavailable'); window.msal = null; };
+  document.head.appendChild(s);
+})();
+</script>
 <script>
 // Load face-api.js safely
 (function(){
