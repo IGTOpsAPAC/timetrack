@@ -489,9 +489,18 @@ function openEmpModal(key) {
   document.getElementById("emp-modal").classList.add("open");
 }
 
+function confirmOverwrite() {
+  document.getElementById("dup-emp-modal").classList.remove("open");
+  saveEmployee(true); // force overwrite
+}
+
+function closeDupModal() {
+  document.getElementById("dup-emp-modal").classList.remove("open");
+}
+
 function closeEmpModal() { document.getElementById("emp-modal").classList.remove("open"); }
 
-function saveEmployee() {
+function saveEmployee(forceOverwrite = false) {
   const name=document.getElementById("emp-name").value.trim(),empId=document.getElementById("emp-id-field").value.trim();
   const area=document.getElementById("emp-area").value,startTime=document.getElementById("emp-start").value;
   const endTime=document.getElementById("emp-end").value,hours=parseFloat(document.getElementById("emp-hours").value);
@@ -500,6 +509,21 @@ function saveEmployee() {
   const status=document.getElementById("emp-status-field")?.value||"Permanent";
   if(!name||!empId){toast("Name and ID required","error");return;}
   if(!/^\d{4}$/.test(pin)){toast("PIN must be exactly 4 digits","error");return;}
+
+  // Duplicate check — only for new employees (not editing)
+  if (!editingEmpKey && !forceOverwrite) {
+    const dupName = employees.find(e => e.name.toLowerCase() === name.toLowerCase());
+    const dupId   = employees.find(e => e.empId.toLowerCase() === empId.toLowerCase());
+    if (dupName || dupId) {
+      const msg = dupName
+        ? `An employee named "${dupName.name}" already exists.`
+        : `Employee ID "${dupId.empId}" is already used by ${dupId.name}.`;
+      // Show overwrite confirmation modal
+      document.getElementById("dup-emp-msg").textContent = msg;
+      document.getElementById("dup-emp-modal").classList.add("open");
+      return;
+    }
+  }
   const emp = { key: editingEmpKey ? employees.find(e=>e.key===editingEmpKey).key : "e"+Date.now(), name, empId, area, startTime, endTime, hours, pin, lunchMins, status };
   // Handle face descriptor
   if (window._pendingFaceDescriptor) emp.faceDescriptor = window._pendingFaceDescriptor;
@@ -1200,8 +1224,20 @@ function backupLog(msg) {
 }
 
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV28";
+const APP_VERSION = "DV29";
 const VERSION_HISTORY = [
+  {
+    version: "DV29",
+    date: "2026-08-03",
+    status: "current",
+    changes: [
+      "Duplicate employee check when adding new employee",
+      "Popup warning if employee name or ID already exists",
+      "Option to Overwrite or Cancel when duplicate detected",
+      "Employee save now correctly writes to EmployeesTable in SharePoint Excel",
+      "Employee sync reads from SharePoint on every app load",
+    ]
+  },
   {
     version: "DV28",
     date: "2026-08-03",
@@ -2232,35 +2268,34 @@ async function syncEmployeesFromSharePoint(silent = false) {
 }
 
 async function saveEmployeeToSharePoint(emp) {
-  // Write employee to SharePoint Excel via existing write flow
+  if (!emp) return;
+  // Write employee to EmployeesTable via Read Employees flow (saveEmployee action)
   try {
-    const resp = await fetch(PA_EXCEL_URL, {
+    const resp = await fetch(PA_READ_EMPLOYEES_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        action:     "saveEmployee",
-        empKey:     emp.key,
-        empName:    emp.name,
-        empId:      emp.empId,
-        area:       emp.area,
-        date:       "",
-        timeIn:     "",
-        timeOut:    "",
-        stdStart:   emp.startTime,
-        stdEnd:     emp.endTime,
-        stdHours:   emp.hours,
-        lunchMins:  emp.lunchMins || 0,
-        status:     emp.status || "Permanent",
-        startVariance: "",
-        endVariance:   "",
-        netHours:      0,
-        difference:    0,
-        attendanceStatus: "Employee Record",
+        action:           "saveEmployee",
+        EmpKey:           emp.key        || "",
+        EmployeeName:     emp.name       || "",
+        EmployeeID:       emp.empId      || "",
+        WorkArea:         emp.area       || "",
+        EmploymentStatus: emp.status     || "Permanent",
+        StdStart:         emp.startTime  || "07:00",
+        StdEnd:           emp.endTime    || "15:30",
+        HoursPerDay:      emp.hours      || 8,
+        LunchMins:        emp.lunchMins  || 30,
+        PIN:              emp.pin        || "0000",
       }),
     });
-    console.log("[PA Employee Save] Status:", resp.status);
+    if (resp.ok || resp.status === 202) {
+      console.log("[PA Employee Save] ✓ Saved to SharePoint:", emp.name);
+      toast(`✓ ${emp.name} saved to SharePoint`, "success");
+    } else {
+      console.warn("[PA Employee Save] ✗ Failed:", resp.status);
+    }
   } catch(e) {
-    console.warn("[PA Employee Save] Failed:", e.message);
+    console.warn("[PA Employee Save] ✗ Network error:", e.message);
   }
 }
 

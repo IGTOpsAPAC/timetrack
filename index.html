@@ -251,7 +251,7 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--text3);border
     </div>
     <div id="emp-grid"></div>
     <div class="admin-link" onclick="showAdminLogin()">⚙ Admin access</div>
-    <div class="login-footer">IGT APAC Manufacturing Operations · <strong>DV28</strong></div>
+    <div class="login-footer">IGT APAC Manufacturing Operations · <strong>DV29</strong></div>
   </div>
 </div>
 
@@ -604,6 +604,19 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--text3);border
     <div class="actions">
       <button class="btn" onclick="closeImportModal()">Cancel</button>
       <button class="btn btn-primary" id="import-confirm-btn" onclick="confirmImport()" style="display:none">✓ Confirm Import</button>
+    </div>
+  </div>
+</div>
+
+<!-- Duplicate employee warning modal -->
+<div class="modal-overlay" id="dup-emp-modal">
+  <div class="modal" style="max-width:400px;text-align:center">
+    <div style="font-size:48px;margin-bottom:.75rem">⚠️</div>
+    <div class="modal-title" style="text-align:center;border-bottom:none;padding-bottom:0">Duplicate Employee</div>
+    <div style="font-size:14px;color:var(--text2);margin:.75rem 0 1.25rem;line-height:1.6" id="dup-emp-msg"></div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button class="btn btn-primary" style="justify-content:center;width:100%" onclick="confirmOverwrite()">✓ Overwrite existing employee</button>
+      <button class="btn" style="justify-content:center;width:100%" onclick="closeDupModal()">✕ Cancel — keep existing</button>
     </div>
   </div>
 </div>
