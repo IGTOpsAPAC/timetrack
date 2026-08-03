@@ -17,6 +17,8 @@ function init() {
   window.addEventListener("offline", updateOnlineStatus);
   // Start auto-save
   startAutoSave();
+  // Sync employees from SharePoint on load
+  syncEmployeesFromSharePoint(true);
   // Init SharePoint sync
   initSpSync();
 }
@@ -511,6 +513,8 @@ function saveEmployee() {
   if(editingEmpKey){ const idx=employees.findIndex(e=>e.key===editingEmpKey); employees[idx]=emp; }
   else employees.push(emp);
   saveLocal();closeEmpModal();renderEmpList();renderEmpGrid();
+  // Sync to SharePoint Excel
+  saveEmployeeToSharePoint(editingEmpKey ? employees.find(e=>e.key===editingEmpKey) : employees[employees.length-1]);
   toast(editingEmpKey?"Employee updated":"Employee added","success");
 }
 
@@ -1196,8 +1200,21 @@ function backupLog(msg) {
 }
 
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV27";
+const APP_VERSION = "DV28";
 const VERSION_HISTORY = [
+  {
+    version: "DV28",
+    date: "2026-08-03",
+    status: "current",
+    changes: [
+      "Employee list syncs automatically from SharePoint Excel on every app load",
+      "All devices always show the same employee list",
+      "Admin adds employee → saves to SharePoint → all devices update automatically",
+      "New Power Automate flow reads EmployeesTable from Attendance.xlsx",
+      "PINs and face descriptors preserved during sync",
+      "Sync status shown in header",
+    ]
+  },
   {
     version: "DV27",
     date: "2026-08-03",
@@ -2149,6 +2166,102 @@ async function spPullAll(silent = false) {
     setSyncStatus("Sync failed");
   }
   spSyncing = false;
+}
+
+
+// ── Power Automate — Read Employees from SharePoint Excel ─────
+const PA_READ_EMPLOYEES_URL = "https://default3c259ff8b3a9490ca23979b422db62.eb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/1fe9cf12e6a7440d8f944cb5df1d039f/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=DKwDvj_WjJjbDQBxEerLQRbhIqS8K79hlOeVfyUNp1I";
+
+async function syncEmployeesFromSharePoint(silent = false) {
+  if (!PA_READ_EMPLOYEES_URL) return;
+  try {
+    if (!silent) toast("Syncing employees from SharePoint…");
+    const resp = await fetch(PA_READ_EMPLOYEES_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "getEmployees" }),
+    });
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const data = await resp.json();
+    
+    // Parse employee rows from Excel table
+    const rows = data.value || data;
+    if (!rows || !rows.length) {
+      if (!silent) toast("No employees found in SharePoint", "error");
+      return;
+    }
+
+    // Map Excel columns to app employee format
+    const synced = rows.map(r => ({
+      key:       r.EmpKey       || "e" + Math.random().toString(36).slice(2,8),
+      name:      r["Employee Name"] || r.EmployeeName || "",
+      empId:     r.EmployeeID   || "",
+      area:      r["Work Area"] || r.Area || "",
+      status:    r["Employment Status"] || r.Status || "Permanent",
+      startTime: r["Std Start"] || r.StartTime || "07:00",
+      endTime:   r["Std End"]   || r.EndTime   || "15:30",
+      hours:     parseFloat(r["Hours Per Day"] || r.HoursPerDay || 8),
+      lunchMins: parseInt(r["Lunch Break (min)"] || r.LunchMins || 30),
+      pin:       r.PIN          || "0000",
+      faceDescriptor: r.FaceData ? JSON.parse(r.FaceData) : null,
+    })).filter(e => e.name);
+
+    if (synced.length) {
+      // Merge — preserve local face descriptors and PINs if not in SharePoint
+      synced.forEach(sp => {
+        const local = employees.find(e => e.empId === sp.empId || e.name.toLowerCase() === sp.name.toLowerCase());
+        if (local) {
+          sp.pin = sp.pin !== "0000" ? sp.pin : local.pin;
+          sp.faceDescriptor = sp.faceDescriptor || local.faceDescriptor;
+          sp.key = local.key; // keep existing key for attendance records
+        }
+      });
+      employees = synced;
+      saveLocal();
+      renderEmpGrid();
+      renderEmpList();
+      const now = new Date().toLocaleTimeString("en-AU", { hour:"2-digit", minute:"2-digit" });
+      setSyncStatus("Employees synced " + now);
+      if (!silent) toast(`✓ ${synced.length} employees loaded from SharePoint`, "success");
+      console.log("[PA Employees] Synced:", synced.length, "employees");
+    }
+  } catch(e) {
+    console.warn("[PA Employees] Sync failed:", e.message);
+    if (!silent) toast("Employee sync failed — using local data", "error");
+  }
+}
+
+async function saveEmployeeToSharePoint(emp) {
+  // Write employee to SharePoint Excel via existing write flow
+  try {
+    const resp = await fetch(PA_EXCEL_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action:     "saveEmployee",
+        empKey:     emp.key,
+        empName:    emp.name,
+        empId:      emp.empId,
+        area:       emp.area,
+        date:       "",
+        timeIn:     "",
+        timeOut:    "",
+        stdStart:   emp.startTime,
+        stdEnd:     emp.endTime,
+        stdHours:   emp.hours,
+        lunchMins:  emp.lunchMins || 0,
+        status:     emp.status || "Permanent",
+        startVariance: "",
+        endVariance:   "",
+        netHours:      0,
+        difference:    0,
+        attendanceStatus: "Employee Record",
+      }),
+    });
+    console.log("[PA Employee Save] Status:", resp.status);
+  } catch(e) {
+    console.warn("[PA Employee Save] Failed:", e.message);
+  }
 }
 
 // ── Power Automate — Write to SharePoint Excel ────────────────
