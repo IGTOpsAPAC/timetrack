@@ -520,44 +520,57 @@ function saveFeatureToggles() {
   settings.barcodeEnabled  = document.getElementById("cfg-barcode-enabled").checked;
   saveLocal();
   applyFeatureToggles();
-  toast("Feature toggles saved", "success");
+  // If login screen is visible, reapply there too
+  const loginScreen = document.getElementById("screen-login");
+  if (loginScreen && loginScreen.classList.contains("active")) {
+    applyFeatureToggles();
+  }
+  toast(`Toggles saved — Face ID: ${settings.faceIdEnabled ? "ON" : "OFF"}, Barcode: ${settings.barcodeEnabled ? "ON" : "OFF"}`, "success");
 }
 
 function applyFeatureToggles() {
-  const faceEnabled    = settings.faceIdEnabled !== false; // default on
-  const barcodeEnabled = settings.barcodeEnabled !== false; // default on
+  const faceEnabled    = settings.faceIdEnabled !== false;
+  const barcodeEnabled = settings.barcodeEnabled !== false;
 
-  // Face ID button
-  const faceBtn  = document.getElementById("faceid-btn");
-  const faceWrap = document.getElementById("face-scanner-wrap");
-  const stopFace = document.getElementById("stop-face-btn");
-  const faceStat = document.getElementById("face-status");
-  if (faceBtn) faceBtn.style.display = faceEnabled ? "" : "none";
+  // ── Login screen buttons — use !important class ──
+  const faceBtn = document.getElementById("faceid-btn");
+  const scanBtn = document.querySelector(".scan-btn");
 
-  // Barcode scanner button
-  const scanBtn  = document.querySelector(".scan-btn");
-  const scanWrap = document.getElementById("scanner-wrap");
-  const stopScan = document.getElementById("stop-scan-btn");
-  if (scanBtn) scanBtn.style.display = barcodeEnabled ? "" : "none";
+  if (faceBtn)  faceBtn.classList.toggle("hidden", !faceEnabled);
+  if (scanBtn)  scanBtn.classList.toggle("hidden", !barcodeEnabled);
 
-  // Update dividers visibility
+  // Hide scanner wraps if disabled
+  if (!faceEnabled) {
+    stopFaceId();
+    const fw = document.getElementById("face-scanner-wrap");
+    const fs = document.getElementById("face-status");
+    const sb = document.getElementById("stop-face-btn");
+    if (fw) fw.style.display = "none";
+    if (fs) fs.style.display = "none";
+    if (sb) sb.style.display = "none";
+  }
+  if (!barcodeEnabled) {
+    stopScanner();
+    const sw  = document.getElementById("scanner-wrap");
+    const ssb = document.getElementById("stop-scan-btn");
+    if (sw)  sw.style.display  = "none";
+    if (ssb) ssb.style.display = "none";
+  }
+
+  // ── Dividers ──
   const dividers = document.querySelectorAll(".scan-divider");
-  if (dividers.length >= 1) dividers[0].style.display = (faceEnabled && barcodeEnabled) ? "" : (barcodeEnabled ? "" : "none");
-  if (dividers.length >= 2) dividers[1].style.display = barcodeEnabled ? "" : "none";
+  if (dividers[0]) dividers[0].style.display = faceEnabled ? "" : "none";
+  if (dividers[1]) dividers[1].style.display = barcodeEnabled ? "" : "none";
 
-  // Update toggle checkboxes in admin
+  // ── Update admin checkboxes ──
   const faceCheck    = document.getElementById("cfg-faceid-enabled");
   const barcodeCheck = document.getElementById("cfg-barcode-enabled");
   const faceLabel    = document.getElementById("cfg-faceid-label");
   const barcodeLabel = document.getElementById("cfg-barcode-label");
-  if (faceCheck)    { faceCheck.checked    = faceEnabled;    }
-  if (barcodeCheck) { barcodeCheck.checked = barcodeEnabled; }
+  if (faceCheck)    faceCheck.checked    = faceEnabled;
+  if (barcodeCheck) barcodeCheck.checked = barcodeEnabled;
   if (faceLabel)    faceLabel.textContent    = faceEnabled    ? "Enabled" : "Disabled";
   if (barcodeLabel) barcodeLabel.textContent = barcodeEnabled ? "Enabled" : "Disabled";
-
-  // If face disabled and currently scanning — stop
-  if (!faceEnabled) stopFaceId();
-  if (!barcodeEnabled) stopScanner();
 }
 
 // Update toggle labels live when checkbox clicked
@@ -568,11 +581,15 @@ function initToggleListeners() {
   if (barcodeCheck) barcodeCheck.addEventListener("change", () => { document.getElementById("cfg-barcode-label").textContent = barcodeCheck.checked ? "Enabled" : "Disabled"; });
 }
 
-function generatePin() {
-  const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // exclude I and O to avoid confusion
+function generatePinValue() {
+  const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ";
   const letter = letters[Math.floor(Math.random() * letters.length)];
-  const digits = Math.floor(1000 + Math.random() * 9000); // 4 digits, never starts with 0
-  const pin = letter + digits;
+  const digits = Math.floor(1000 + Math.random() * 9000);
+  return letter + digits;
+}
+
+function generatePin() {
+  const pin = generatePinValue();
   const pinField = document.getElementById("emp-pin");
   if (pinField) {
     pinField.value = pin;
@@ -764,6 +781,21 @@ function parseImportFile(buffer) {
     seenIds.add(empId);
 
     const existing = employees.find(e => e.name.toLowerCase() === nameKey);
+
+    // Handle PIN — use from Excel if provided, keep existing if editing, otherwise auto-generate
+    const excelPin = (row["PIN"] || row["Pin"] || row["pin"] || "").toString().trim().toUpperCase();
+    let assignedPin;
+    if (existing) {
+      // Keep existing PIN unless Excel provides a new one
+      assignedPin = excelPin && validatePin(excelPin) ? excelPin : existing.pin;
+    } else if (excelPin && validatePin(excelPin)) {
+      // Use PIN from Excel if valid
+      assignedPin = excelPin;
+    } else {
+      // Auto-generate PIN
+      assignedPin = generatePinValue();
+    }
+
     parsed.push({
       key: existing ? existing.key : "e" + Date.now() + Math.random().toString(36).slice(2,6),
       name, area, status,
@@ -772,7 +804,8 @@ function parseImportFile(buffer) {
       friStart: friTimes ? friTimes[0] : monThuTimes[0],
       friEnd:   friTimes ? friTimes[1] : monThuTimes[1],
       hours: calcStdHours(monThuTimes[0], monThuTimes[1]),
-      pin: existing ? existing.pin : "0000",
+      pin: assignedPin,
+      pinGenerated: !excelPin && !existing, // flag to show in preview
       isExisting: !!existing, isNew: !existing,
     });
   });
@@ -817,11 +850,11 @@ function showImportModal(parsed, errors) {
         <td style="font-size:12px;white-space:nowrap">${r.startTime}–${r.endTime}</td>
         <td style="font-size:12px;white-space:nowrap">${r.friStart}–${r.friEnd}</td>
         <td style="font-size:12px">${r.hours}h</td>
-        <td style="font-size:12px;color:var(--text3)">${r.isExisting?"unchanged":"0000"}</td>
+        <td style="font-size:12px;${r.pinGenerated?'color:var(--igt-blue);font-weight:600':'color:var(--text3)'}">${r.isExisting ? "unchanged" : r.pin}</td>
       </tr>`).join("")}</tbody>
     </table></div>
     ${overwriteCount ? `<div style="font-size:12px;color:#7a5500;margin-top:.5rem;padding:.6rem .75rem;background:#fff8e1;border-radius:var(--radius-sm)">⚠ <strong>${overwriteCount} existing employee${overwriteCount>1?"s":""}</strong> will be overwritten. Their PINs and attendance history will be preserved.</div>` : ""}
-    <div style="font-size:12px;color:var(--text2);margin-top:.5rem">💡 New employees get default PIN <strong>0000</strong> — update each PIN in Admin after import.</div>` : "";
+    <div style="font-size:12px;color:var(--text2);margin-top:.5rem">💡 PINs shown in <strong style="color:var(--igt-blue)">blue</strong> were auto-generated. Share each employee's PIN with them after import. PINs from your Excel file are used as-is if provided.</div>` : "";
 
   document.getElementById("import-confirm-btn").style.display = (!hasErrors && parsed.length) ? "" : "none";
   document.getElementById("import-modal").classList.add("open");
@@ -829,18 +862,49 @@ function showImportModal(parsed, errors) {
 
 function confirmImport() {
   let added = 0, updated = 0;
+  const newPins = [];
   importQueue.forEach(r => {
     const idx = employees.findIndex(e => e.key === r.key);
-    const emp = { key:r.key, name:r.name, empId:r.empId, area:r.area, startTime:r.startTime, endTime:r.endTime, hours:r.hours, pin:r.pin };
+    const emp = { key:r.key, name:r.name, empId:r.empId, area:r.area, startTime:r.startTime, endTime:r.endTime, hours:r.hours, pin:r.pin, lunchMins:r.lunchMins||30, status:r.status||"Permanent" };
     if (idx >= 0) { employees[idx] = emp; updated++; }
     else          { employees.push(emp); added++; }
+    if (r.pinGenerated) newPins.push({ name:r.name, empId:r.empId||"", pin:r.pin });
   });
   saveLocal();
   closeImportModal();
   renderEmpList();
   renderEmpGrid();
   toast(`✓ Imported: ${added} new, ${updated} updated`, "success");
+  // Offer PIN download if any were auto-generated
+  if (newPins.length) {
+    setTimeout(() => {
+      if (confirm(`${newPins.length} PIN${newPins.length>1?"s were":"was"} auto-generated.\n\nDownload a PIN list to share with employees?`)) {
+        downloadPinList(newPins);
+      }
+    }, 600);
+  }
   importQueue = [];
+}
+
+function downloadPinList(pins) {
+  const lines = [
+    "IGT TimeTrack — Employee PIN List",
+    `Generated: ${new Date().toLocaleString("en-AU")}`,
+    `CONFIDENTIAL — Share each PIN only with the respective employee`,
+    "",
+    "Employee Name,Employee ID,PIN",
+    ...pins.map(p => `"${p.name}","${p.empId}","${p.pin}"`)
+  ];
+  const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `IGT_TimeTrack_PINs_${today()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast("✓ PIN list downloaded!", "success");
 }
 
 function closeImportModal() {
@@ -1313,8 +1377,21 @@ function backupLog(msg) {
 }
 
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV30";
+const APP_VERSION = "DV31";
 const VERSION_HISTORY = [
+  {
+    version: "DV31",
+    date: "2026-08-03",
+    status: "current",
+    changes: [
+      "Version bump — consolidates all DV30 features into clean release",
+      "Face ID toggle fixed — uses CSS class with !important override",
+      "Auto-generate PIN on import — blank or missing PIN column generates random PIN",
+      "PIN download after import — offers CSV of generated PINs to share with employees",
+      "Version history card now shows correct current version dynamically",
+      "Employee ID field is optional when adding employees",
+    ]
+  },
   {
     version: "DV30",
     date: "2026-08-03",
