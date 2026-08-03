@@ -1383,8 +1383,18 @@ function backupLog(msg) {
 }
 
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV32";
+const APP_VERSION = "DV33";
 const VERSION_HISTORY = [
+  {
+    version: "DV33",
+    date: "2026-08-03",
+    status: "current",
+    changes: [
+      "Toggle fix — switched to setAttribute style with display:none!important",
+      "Removed display:flex from faceid-btn CSS class to allow inline style override",
+      "Face ID and Barcode Scanner toggle now reliably hides buttons on home screen",
+    ]
+  },
   {
     version: "DV32",
     date: "2026-08-03",
