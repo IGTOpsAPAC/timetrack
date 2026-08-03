@@ -1388,8 +1388,19 @@ function backupLog(msg) {
 }
 
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV34";
+const APP_VERSION = "DV35";
 const VERSION_HISTORY = [
+  {
+    version: "DV35",
+    date: "2026-08-03",
+    status: "current",
+    changes: [
+      "Fixed Chrome caching issue — service worker updated to v35, forces fresh file download",
+      "HTML/JS files now use network-first strategy — always loads latest version",
+      "Added no-cache meta tags to prevent browser caching of old versions",
+      "All Chrome issues (toggle, admin tab, clock, employees) should now be resolved",
+    ]
+  },
   {
     version: "DV34",
     date: "2026-08-03",
