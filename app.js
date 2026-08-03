@@ -1388,8 +1388,19 @@ function backupLog(msg) {
 }
 
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV35";
+const APP_VERSION = "DV36";
 const VERSION_HISTORY = [
+  {
+    version: "DV36",
+    date: "2026-08-03",
+    status: "current",
+    changes: [
+      "Disabled service worker caching — was causing Chrome to serve stale files",
+      "App now unregisters all existing service workers on load to clear old cache",
+      "All caches cleared on startup — always loads fresh files",
+      "Chrome should now work identically to Edge",
+    ]
+  },
   {
     version: "DV35",
     date: "2026-08-03",

@@ -257,7 +257,7 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--text3);border
     </div>
     <div id="emp-grid"></div>
     <div class="admin-link" onclick="showAdminLogin()">⚙ Admin access</div>
-    <div class="login-footer">IGT APAC Manufacturing Operations · <strong>DV35</strong></div>
+    <div class="login-footer">IGT APAC Manufacturing Operations · <strong>DV36</strong></div>
   </div>
 </div>
 
@@ -809,7 +809,13 @@ document.querySelectorAll('.nav-btn').forEach(b=>{
     if(el&&m) el.textContent=stripMap[m[1]]||'';
   });
 });
-if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(console.error);
+// Unregister any existing service workers and clear all caches
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    regs.forEach(reg => reg.unregister());
+  });
+  caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+}
 </script>
 </body>
 </html>
