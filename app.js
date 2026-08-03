@@ -246,15 +246,18 @@ function verifyAdminPin() {
   if (adminPinBuffer === (settings.adminPin||"0000")) {
     closeAdminModal();
     isAdminUnlocked = true;
+    // Show admin nav and signout button FIRST
     document.querySelectorAll(".admin-only").forEach(el => el.style.display = "");
     document.getElementById("admin-signout-btn").style.display = "";
-    // Show app screen without triggering renderAll yet
+    // Show app screen
     document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
     document.getElementById("screen-app").classList.add("active");
     renderAll();
-    // Navigate to admin tab AFTER renderAll
-    const adminBtn = [...document.querySelectorAll(".nav-btn")].find(b => b.getAttribute("onclick")?.includes("admin"));
-    showSection("admin", adminBtn);
+    // Now find and click admin tab (it's visible now)
+    setTimeout(() => {
+      const adminBtn = [...document.querySelectorAll(".nav-btn")].find(b => b.getAttribute("onclick")?.includes("'admin'"));
+      if (adminBtn) showSection("admin", adminBtn);
+    }, 50);
     toast("Admin access granted", "success");
   } else {
     adminPinBuffer = "";
@@ -534,12 +537,12 @@ function applyFeatureToggles() {
   const faceEnabled    = settings.faceIdEnabled !== false;
   const barcodeEnabled = settings.barcodeEnabled !== false;
 
-  // ── Login screen buttons — use !important class ──
+  // Use setAttribute style to override CSS class display:flex
   const faceBtn = document.getElementById("faceid-btn");
   const scanBtn = document.querySelector(".scan-btn");
 
-  if (faceBtn)  faceBtn.classList.toggle("hidden", !faceEnabled);
-  if (scanBtn)  scanBtn.classList.toggle("hidden", !barcodeEnabled);
+  if (faceBtn)  faceBtn.setAttribute("style", faceEnabled    ? "" : "display:none!important");
+  if (scanBtn)  scanBtn.setAttribute("style", barcodeEnabled ? "" : "display:none!important");
 
   // Hide scanner wraps if disabled
   if (!faceEnabled) {
@@ -561,7 +564,7 @@ function applyFeatureToggles() {
 
   // ── Dividers ──
   const dividers = document.querySelectorAll(".scan-divider");
-  if (dividers[0]) dividers[0].style.display = faceEnabled ? "" : "none";
+  if (dividers[0]) dividers[0].style.display = faceEnabled    ? "" : "none";
   if (dividers[1]) dividers[1].style.display = barcodeEnabled ? "" : "none";
 
   // ── Update admin checkboxes ──
