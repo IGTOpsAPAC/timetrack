@@ -17,6 +17,9 @@ function init() {
   window.addEventListener("offline", updateOnlineStatus);
   // Start auto-save
   startAutoSave();
+  // Apply feature toggles
+  applyFeatureToggles();
+  initToggleListeners();
   // Sync employees from SharePoint on load
   syncEmployeesFromSharePoint(true);
   // Init SharePoint sync
@@ -34,9 +37,9 @@ function loadLocal() {
   settings = JSON.parse(localStorage.getItem("tt_settings") || "{}");
   if (!employees.length) {
     employees = [
-      { key:"e1", name:"Alex Chen",    empId:"EMP001", area:"Production", startTime:"09:00", endTime:"17:00", hours:8, pin:"1234" },
-      { key:"e2", name:"Jordan Smith", empId:"EMP002", area:"Warehouse",  startTime:"08:00", endTime:"16:00", hours:8, pin:"2345" },
-      { key:"e3", name:"Sam Patel",    empId:"EMP003", area:"Office",     startTime:"07:00", endTime:"15:00", hours:8, pin:"3456" },
+      { key:"e1", name:"Alex Chen",    empId:"EMP001", area:"Production", startTime:"09:00", endTime:"17:00", hours:8, pin:"A1234" },
+      { key:"e2", name:"Jordan Smith", empId:"EMP002", area:"Warehouse",  startTime:"08:00", endTime:"16:00", hours:8, pin:"B2345" },
+      { key:"e3", name:"Sam Patel",    empId:"EMP003", area:"Office",     startTime:"07:00", endTime:"15:00", hours:8, pin:"C3456" },
     ];
     settings = { adminPin:"0000", areas:"Gaming Assembly,Fintech Assembly,Repair Centre,Warehouse,Operations Support", company:"IGT APAC Manufacturing", recipientName:"Operations Manager", recipientEmail:"manager@igt.com", siteName:"APACManufacturingOperationsTeam", filePath:"General/ATTENDANCE/Attendance.xlsx", defaultLunch:30 };
     saveLocal();
@@ -176,11 +179,23 @@ function updatePinDots(id, len, state) {
 }
 
 function pinPress(d) {
-  if (pinBuffer.length>=4) return;
-  pinBuffer += d;
+  if (pinBuffer.length >= 5) return;
+  // First character must be a letter
+  if (pinBuffer.length === 0 && /\d/.test(d)) {
+    document.getElementById("pin-error").textContent = "Start with your letter first!";
+    setTimeout(() => { document.getElementById("pin-error").textContent = ""; }, 1200);
+    return;
+  }
+  // Subsequent characters must be digits
+  if (pinBuffer.length > 0 && /[A-Za-z]/.test(d)) {
+    document.getElementById("pin-error").textContent = "Enter 4 digits after the letter";
+    setTimeout(() => { document.getElementById("pin-error").textContent = ""; }, 1200);
+    return;
+  }
+  pinBuffer += d.toUpperCase();
   updatePinDots("pin-dots", pinBuffer.length, "");
   document.getElementById("pin-error").textContent = "";
-  if (pinBuffer.length===4) setTimeout(verifyPin, 150);
+  if (pinBuffer.length === 5) setTimeout(verifyPin, 150);
 }
 
 function pinDel() {
@@ -193,7 +208,7 @@ function pinDel() {
 function verifyPin() {
   const emp = employees.find(e=>e.key===selectedEmpKey);
   if (!emp) return;
-  if (pinBuffer === emp.pin) {
+  if (pinBuffer.toUpperCase() === (emp.pin || "").toUpperCase()) {
     showScreen("screen-app");
     showSection("clock", document.querySelector(".nav-btn"));
     performClockAction(emp.key);
@@ -483,6 +498,8 @@ function openEmpModal(key) {
     document.getElementById("emp-end").value="17:00";
     document.getElementById("emp-hours").value="8";
     document.getElementById("emp-lunch").value=settings.defaultLunch||30;
+    // Auto-generate PIN for new employee
+    setTimeout(() => generatePin(), 50);
     document.getElementById("enroll-status-badge").innerHTML = '<span style="font-size:12px;color:var(--text2)">No face enrolled</span>';
     document.getElementById("enroll-clear-btn").style.display = "none";
   }
@@ -498,27 +515,98 @@ function closeDupModal() {
   document.getElementById("dup-emp-modal").classList.remove("open");
 }
 
+function saveFeatureToggles() {
+  settings.faceIdEnabled   = document.getElementById("cfg-faceid-enabled").checked;
+  settings.barcodeEnabled  = document.getElementById("cfg-barcode-enabled").checked;
+  saveLocal();
+  applyFeatureToggles();
+  toast("Feature toggles saved", "success");
+}
+
+function applyFeatureToggles() {
+  const faceEnabled    = settings.faceIdEnabled !== false; // default on
+  const barcodeEnabled = settings.barcodeEnabled !== false; // default on
+
+  // Face ID button
+  const faceBtn  = document.getElementById("faceid-btn");
+  const faceWrap = document.getElementById("face-scanner-wrap");
+  const stopFace = document.getElementById("stop-face-btn");
+  const faceStat = document.getElementById("face-status");
+  if (faceBtn) faceBtn.style.display = faceEnabled ? "" : "none";
+
+  // Barcode scanner button
+  const scanBtn  = document.querySelector(".scan-btn");
+  const scanWrap = document.getElementById("scanner-wrap");
+  const stopScan = document.getElementById("stop-scan-btn");
+  if (scanBtn) scanBtn.style.display = barcodeEnabled ? "" : "none";
+
+  // Update dividers visibility
+  const dividers = document.querySelectorAll(".scan-divider");
+  if (dividers.length >= 1) dividers[0].style.display = (faceEnabled && barcodeEnabled) ? "" : (barcodeEnabled ? "" : "none");
+  if (dividers.length >= 2) dividers[1].style.display = barcodeEnabled ? "" : "none";
+
+  // Update toggle checkboxes in admin
+  const faceCheck    = document.getElementById("cfg-faceid-enabled");
+  const barcodeCheck = document.getElementById("cfg-barcode-enabled");
+  const faceLabel    = document.getElementById("cfg-faceid-label");
+  const barcodeLabel = document.getElementById("cfg-barcode-label");
+  if (faceCheck)    { faceCheck.checked    = faceEnabled;    }
+  if (barcodeCheck) { barcodeCheck.checked = barcodeEnabled; }
+  if (faceLabel)    faceLabel.textContent    = faceEnabled    ? "Enabled" : "Disabled";
+  if (barcodeLabel) barcodeLabel.textContent = barcodeEnabled ? "Enabled" : "Disabled";
+
+  // If face disabled and currently scanning — stop
+  if (!faceEnabled) stopFaceId();
+  if (!barcodeEnabled) stopScanner();
+}
+
+// Update toggle labels live when checkbox clicked
+function initToggleListeners() {
+  const faceCheck    = document.getElementById("cfg-faceid-enabled");
+  const barcodeCheck = document.getElementById("cfg-barcode-enabled");
+  if (faceCheck)    faceCheck.addEventListener("change", () => { document.getElementById("cfg-faceid-label").textContent    = faceCheck.checked    ? "Enabled" : "Disabled"; });
+  if (barcodeCheck) barcodeCheck.addEventListener("change", () => { document.getElementById("cfg-barcode-label").textContent = barcodeCheck.checked ? "Enabled" : "Disabled"; });
+}
+
+function generatePin() {
+  const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // exclude I and O to avoid confusion
+  const letter = letters[Math.floor(Math.random() * letters.length)];
+  const digits = Math.floor(1000 + Math.random() * 9000); // 4 digits, never starts with 0
+  const pin = letter + digits;
+  const pinField = document.getElementById("emp-pin");
+  if (pinField) {
+    pinField.value = pin;
+    pinField.style.color = "var(--igt-blue)";
+    pinField.style.fontWeight = "700";
+  }
+  toast(`PIN generated: ${pin}`, "success");
+}
+
+function validatePin(pin) {
+  // Accept: 1 letter + 4 digits (new format) OR 4 digits (legacy)
+  return /^[A-Za-z]\d{4}$/.test(pin) || /^\d{4}$/.test(pin);
+}
+
 function closeEmpModal() { document.getElementById("emp-modal").classList.remove("open"); }
 
 function saveEmployee(forceOverwrite = false) {
   const name=document.getElementById("emp-name").value.trim(),empId=document.getElementById("emp-id-field").value.trim();
   const area=document.getElementById("emp-area").value,startTime=document.getElementById("emp-start").value;
   const endTime=document.getElementById("emp-end").value,hours=parseFloat(document.getElementById("emp-hours").value);
-  const pin=document.getElementById("emp-pin").value.trim();
+  const pin = document.getElementById("emp-pin").value.trim().toUpperCase();
   const lunchMins=parseInt(document.getElementById("emp-lunch").value)||0;
   const status=document.getElementById("emp-status-field")?.value||"Permanent";
-  if(!name||!empId){toast("Name and ID required","error");return;}
-  if(!/^\d{4}$/.test(pin)){toast("PIN must be exactly 4 digits","error");return;}
+  if(!name){toast("Employee name is required","error");return;}
+  if(!validatePin(pin)){toast("PIN must be 1 letter + 4 digits (e.g. A1234) or 4 digits","error");return;}
 
   // Duplicate check — only for new employees (not editing)
   if (!editingEmpKey && !forceOverwrite) {
     const dupName = employees.find(e => e.name.toLowerCase() === name.toLowerCase());
-    const dupId   = employees.find(e => e.empId.toLowerCase() === empId.toLowerCase());
+    const dupId   = empId ? employees.find(e => e.empId && e.empId.toLowerCase() === empId.toLowerCase()) : null;
     if (dupName || dupId) {
       const msg = dupName
         ? `An employee named "${dupName.name}" already exists.`
         : `Employee ID "${dupId.empId}" is already used by ${dupId.name}.`;
-      // Show overwrite confirmation modal
       document.getElementById("dup-emp-msg").textContent = msg;
       document.getElementById("dup-emp-modal").classList.add("open");
       return;
@@ -1040,6 +1128,7 @@ function showScreen(id) {
     selectedEmpKey = null;
     const s = document.getElementById("emp-search");
     if (s) { s.value = ""; }
+    applyFeatureToggles();
   }
   if (id === "screen-app") renderAll();
 }
@@ -1224,8 +1313,20 @@ function backupLog(msg) {
 }
 
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV29";
+const APP_VERSION = "DV30";
 const VERSION_HISTORY = [
+  {
+    version: "DV30",
+    date: "2026-08-03",
+    status: "current",
+    changes: [
+      "Feature toggles added in Admin — enable/disable Face ID and Barcode Scanner",
+      "Face ID and Barcode can be turned off independently",
+      "PIN login always remains enabled",
+      "Employee ID field is now optional when adding employees",
+      "Toggles apply immediately without needing to reload",
+    ]
+  },
   {
     version: "DV29",
     date: "2026-08-03",
@@ -1536,8 +1637,10 @@ const VERSION_HISTORY = [
 
 function renderLatestVersion() {
   const el = document.getElementById("version-latest");
+  const vLabel = document.getElementById("current-version-label");
+  if (vLabel) vLabel.textContent = APP_VERSION;
   if (!el) return;
-  const latest = VERSION_HISTORY[0];
+  const latest = VERSION_HISTORY.find(v => v.version === APP_VERSION) || VERSION_HISTORY[0];
   el.innerHTML = `<div style="font-size:12px;color:var(--text2);margin-bottom:4px">${latest.date} — What's new in ${latest.version}:</div>
     <ul style="padding-left:1.25rem;margin:0">
       ${latest.changes.slice(0,3).map(c=>`<li style="font-size:12px;color:var(--text);margin-bottom:2px">${c}</li>`).join("")}

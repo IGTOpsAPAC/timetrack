@@ -251,7 +251,7 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--text3);border
     </div>
     <div id="emp-grid"></div>
     <div class="admin-link" onclick="showAdminLogin()">⚙ Admin access</div>
-    <div class="login-footer">IGT APAC Manufacturing Operations · <strong>DV29</strong></div>
+    <div class="login-footer">IGT APAC Manufacturing Operations · <strong>DV30</strong></div>
   </div>
 </div>
 
@@ -267,7 +267,38 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--text3);border
       <div class="pin-dot"></div>
       <div class="pin-dot"></div>
       <div class="pin-dot"></div>
+      <div class="pin-dot"></div>
     </div>
+    <div style="font-size:11px;color:var(--text2);margin-bottom:.75rem">Enter your letter then 4 digits</div>
+    <!-- Letter row -->
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:6px">
+      <button class="pin-key" style="font-size:14px" onclick="pinPress('A')">A</button>
+      <button class="pin-key" style="font-size:14px" onclick="pinPress('B')">B</button>
+      <button class="pin-key" style="font-size:14px" onclick="pinPress('C')">C</button>
+      <button class="pin-key" style="font-size:14px" onclick="pinPress('D')">D</button>
+      <button class="pin-key" style="font-size:14px" onclick="pinPress('E')">E</button>
+      <button class="pin-key" style="font-size:14px" onclick="pinPress('F')">F</button>
+      <button class="pin-key" style="font-size:14px" onclick="pinPress('G')">G</button>
+      <button class="pin-key" style="font-size:14px" onclick="pinPress('H')">H</button>
+      <button class="pin-key" style="font-size:14px" onclick="pinPress('J')">J</button>
+      <button class="pin-key" style="font-size:14px" onclick="pinPress('K')">K</button>
+      <button class="pin-key" style="font-size:14px" onclick="pinPress('L')">L</button>
+      <button class="pin-key" style="font-size:14px" onclick="pinPress('M')">M</button>
+      <button class="pin-key" style="font-size:14px" onclick="pinPress('N')">N</button>
+      <button class="pin-key" style="font-size:14px" onclick="pinPress('P')">P</button>
+      <button class="pin-key" style="font-size:14px" onclick="pinPress('Q')">Q</button>
+      <button class="pin-key" style="font-size:14px" onclick="pinPress('R')">R</button>
+      <button class="pin-key" style="font-size:14px" onclick="pinPress('S')">S</button>
+      <button class="pin-key" style="font-size:14px" onclick="pinPress('T')">T</button>
+      <button class="pin-key" style="font-size:14px" onclick="pinPress('U')">U</button>
+      <button class="pin-key" style="font-size:14px" onclick="pinPress('V')">V</button>
+      <button class="pin-key" style="font-size:14px" onclick="pinPress('W')">W</button>
+      <button class="pin-key" style="font-size:14px" onclick="pinPress('X')">X</button>
+      <button class="pin-key" style="font-size:14px" onclick="pinPress('Y')">Y</button>
+      <button class="pin-key" style="font-size:14px" onclick="pinPress('Z')">Z</button>
+      <button class="pin-key del" onclick="pinDel()">⌫</button>
+    </div>
+    <!-- Number row -->
     <div class="pin-pad">
       <button class="pin-key" onclick="pinPress('1')">1</button>
       <button class="pin-key" onclick="pinPress('2')">2</button>
@@ -410,6 +441,40 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--text3);border
             <button class="btn btn-primary" onclick="saveSettings()">✓ Save Settings</button>
           </div>
           <div class="card" style="margin-top:1rem">
+            <div class="card-section-header">🔧 Feature Toggles</div>
+            <div style="font-size:12px;color:var(--text2);margin-bottom:.75rem">Enable or disable login methods on the home screen.</div>
+            <div class="form-row" style="display:flex;align-items:center;justify-content:space-between">
+              <div>
+                <div style="font-size:13px;font-weight:600">Face ID Login</div>
+                <div style="font-size:12px;color:var(--text2)">Show Face ID button on home screen</div>
+              </div>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;font-weight:400;font-size:13px">
+                <input type="checkbox" id="cfg-faceid-enabled" style="width:18px;height:18px;cursor:pointer"/>
+                <span id="cfg-faceid-label">Enabled</span>
+              </label>
+            </div>
+            <div class="divider"></div>
+            <div class="form-row" style="display:flex;align-items:center;justify-content:space-between">
+              <div>
+                <div style="font-size:13px;font-weight:600">Barcode Scanner</div>
+                <div style="font-size:12px;color:var(--text2)">Show barcode scan button on home screen</div>
+              </div>
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;font-weight:400;font-size:13px">
+                <input type="checkbox" id="cfg-barcode-enabled" style="width:18px;height:18px;cursor:pointer"/>
+                <span id="cfg-barcode-label">Enabled</span>
+              </label>
+            </div>
+            <div class="divider"></div>
+            <div class="form-row" style="display:flex;align-items:center;justify-content:space-between">
+              <div>
+                <div style="font-size:13px;font-weight:600">PIN Login</div>
+                <div style="font-size:12px;color:var(--text2)">Always enabled — cannot be disabled</div>
+              </div>
+              <span class="badge badge-green" style="font-size:12px">● Always on</span>
+            </div>
+            <button class="btn btn-primary" style="margin-top:.5rem" onclick="saveFeatureToggles()">✓ Save toggles</button>
+          </div>
+          <div class="card" style="margin-top:1rem">
             <div class="card-section-header">💾 CSV Attendance Backup</div>
             <div style="font-size:12px;color:var(--text2);margin-bottom:.75rem">
               Automatically saves attendance data as a CSV file to your Downloads folder. Open directly in Excel. Also saves a full JSON backup for restoring data.
@@ -461,7 +526,7 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--text3);border
           <div class="card" style="margin-top:1rem">
             <div class="card-section-header">📋 Version History</div>
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
-              <div style="font-size:13px;color:var(--text2)">Current: <strong style="color:var(--igt-blue)">DV17</strong></div>
+              <div style="font-size:13px;color:var(--text2)">Current: <strong style="color:var(--igt-blue)" id="current-version-label">DV30</strong></div>
               <button class="btn btn-primary" style="padding:6px 14px;font-size:12px" onclick="showVersionHistory()">View all versions</button>
             </div>
             <div id="version-latest"></div>
@@ -482,7 +547,7 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--text3);border
     <div class="modal-title" id="modal-title">Add / Edit Employee</div>
     <div class="grid2">
       <div class="form-row"><label>Full name</label><input type="text" id="emp-name" placeholder="Jane Smith"/></div>
-      <div class="form-row"><label>Employee ID</label><input type="text" id="emp-id-field" placeholder="EMP001"/></div>
+      <div class="form-row"><label>Employee ID <span style="font-weight:400;color:var(--text3)">(optional)</span></label><input type="text" id="emp-id-field" placeholder="e.g. EMP001"/></div>
     </div>
     <div class="form-row"><label>Work area</label><select id="emp-area"></select></div>
     <div class="grid2">
@@ -502,9 +567,12 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--text3);border
       </select>
     </div>
     <div class="form-row">
-      <label>Employee PIN (4 digits)</label>
-      <input type="password" id="emp-pin" maxlength="4" placeholder="e.g. 1234" style="letter-spacing:4px;font-size:20px"/>
-      <div style="font-size:11px;color:var(--text2);margin-top:4px">Employee uses this PIN to confirm clock in/out</div>
+      <label>Employee PIN <span style="font-weight:400;color:var(--text3)">(1 letter + 4 digits)</span></label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="text" id="emp-pin" maxlength="5" placeholder="e.g. A1234" style="letter-spacing:4px;font-size:18px;text-transform:uppercase;flex:1"/>
+        <button type="button" class="btn" onclick="generatePin()" style="white-space:nowrap;padding:9px 12px">🔀 Generate</button>
+      </div>
+      <div style="font-size:11px;color:var(--text2);margin-top:4px">Format: 1 letter + 4 digits (e.g. A1234). Click Generate for a random PIN.</div>
     </div>
     <div class="form-row face-enroll-wrap">
       <label>Face ID</label>
