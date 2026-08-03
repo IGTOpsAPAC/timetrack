@@ -537,12 +537,17 @@ function applyFeatureToggles() {
   const faceEnabled    = settings.faceIdEnabled !== false;
   const barcodeEnabled = settings.barcodeEnabled !== false;
 
-  // Use setAttribute style to override CSS class display:flex
-  const faceBtn = document.getElementById("faceid-btn");
-  const scanBtn = document.querySelector(".scan-btn");
-
-  if (faceBtn)  faceBtn.setAttribute("style", faceEnabled    ? "" : "display:none!important");
-  if (scanBtn)  scanBtn.setAttribute("style", barcodeEnabled ? "" : "display:none!important");
+  // Inject a dynamic stylesheet rule — works in all browsers including Chrome
+  let styleEl = document.getElementById("toggle-styles");
+  if (!styleEl) {
+    styleEl = document.createElement("style");
+    styleEl.id = "toggle-styles";
+    document.head.appendChild(styleEl);
+  }
+  let css = "";
+  if (!faceEnabled)    css += "#faceid-btn { display: none !important; }\n";
+  if (!barcodeEnabled) css += ".scan-btn { display: none !important; }\n";
+  styleEl.textContent = css;
 
   // Hide scanner wraps if disabled
   if (!faceEnabled) {
@@ -1383,8 +1388,17 @@ function backupLog(msg) {
 }
 
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV33";
+const APP_VERSION = "DV34";
 const VERSION_HISTORY = [
+  {
+    version: "DV34",
+    date: "2026-08-03",
+    status: "current",
+    changes: [
+      "Fixed toggle for Chrome — inline !important ignored by Chrome, switched to dynamic stylesheet injection",
+      "Feature toggles now work consistently across Edge, Chrome, Safari and all browsers",
+    ]
+  },
   {
     version: "DV33",
     date: "2026-08-03",
