@@ -109,8 +109,15 @@ function filterEmpList() {
 }
 
 function selectEmployeeFromList(el) {
-  const safeKey = el.getAttribute("data-empkey");
+  // Walk up DOM tree to find element with data-empkey (in case a child was clicked)
+  let target = el;
+  while (target && !target.getAttribute("data-empkey")) {
+    target = target.parentElement;
+  }
+  if (!target) { console.error("No data-empkey found"); return; }
+  const safeKey = target.getAttribute("data-empkey");
   const key = decodeURIComponent(safeKey);
+  console.log("[Select] key:", key, "name:", employees.find(e=>e.key===key)?.name);
   selectEmployee(key);
 }
 
@@ -1531,8 +1538,18 @@ function closeGeoBlockModal() {
 }
 
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV38";
+const APP_VERSION = "DV39";
 const VERSION_HISTORY = [
+  {
+    version: "DV39",
+    date: "2026-08-04",
+    status: "current",
+    changes: [
+      "Fixed wrong employee in PIN screen — onclick passes child element not parent",
+      "selectEmployeeFromList now walks up DOM tree to find data-empkey attribute",
+      "Console log added to confirm correct employee key is being selected",
+    ]
+  },
   {
     version: "DV38",
     date: "2026-08-04",
