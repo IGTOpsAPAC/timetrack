@@ -650,7 +650,8 @@ function saveEmployee(forceOverwrite = false) {
   if(!validatePin(pin)){toast("PIN must be 1 letter + 4 digits (e.g. A1234) or 4 digits","error");return;}
 
   // Duplicate check — only for new employees (not editing)
-  if (!editingEmpKey && !forceOverwrite) {
+  const isNewEmployee = !editingEmpKey;
+  if (isNewEmployee && !forceOverwrite) {
     const dupName = employees.find(e => e.name.toLowerCase() === name.toLowerCase());
     const dupId   = empId ? employees.find(e => e.empId && e.empId.toLowerCase() === empId.toLowerCase()) : null;
     if (dupName || dupId) {
@@ -658,6 +659,15 @@ function saveEmployee(forceOverwrite = false) {
         ? `An employee named "${dupName.name}" already exists.`
         : `Employee ID "${dupId.empId}" is already used by ${dupId.name}.`;
       document.getElementById("dup-emp-msg").textContent = msg;
+      document.getElementById("dup-emp-modal").classList.add("open");
+      return;
+    }
+  }
+  // Also check by nameToKey — catch duplicates even with different casing
+  if (isNewEmployee && !forceOverwrite) {
+    const dupKey = employees.find(e => nameToKey(e.name) === nameToKey(name));
+    if (dupKey) {
+      document.getElementById("dup-emp-msg").textContent = `An employee named "${dupKey.name}" already exists.`;
       document.getElementById("dup-emp-modal").classList.add("open");
       return;
     }
@@ -1544,8 +1554,18 @@ function closeGeoBlockModal() {
 }
 
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV42";
+const APP_VERSION = "DV43";
 const VERSION_HISTORY = [
+  {
+    version: "DV43",
+    date: "2026-08-04",
+    status: "current",
+    changes: [
+      "Duplicate employee check fixed — checks both by name and by nameToKey",
+      "Added secondary duplicate check using nameToKey to catch case variations",
+      "editingEmpKey properly reset to null when adding new employee",
+    ]
+  },
   {
     version: "DV42",
     date: "2026-08-04",
