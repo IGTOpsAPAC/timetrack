@@ -82,7 +82,9 @@ function renderEmpGrid(filter) {
       : done
       ? '<span class="badge badge-gray" style="font-size:11px">✓ Done</span>'
       : '<span class="badge badge-amber" style="font-size:11px">○ Not in</span>';
-    return `<div class="emp-list-item" onclick="selectEmployee('${e.key}')">
+    // Use data-key attribute to avoid quote escaping issues with special characters in keys
+    const safeKey = encodeURIComponent(e.key);
+    return `<div class="emp-list-item" data-empkey="${safeKey}" onclick="selectEmployeeFromList(this)">
       <div class="emp-avatar" style="${avatarStyle(i)};width:40px;height:40px;font-size:14px;flex-shrink:0">${initials(e.name)}</div>
       <div class="emp-item-info">
         <div class="emp-item-name">${highlight(e.name, q)}</div>
@@ -104,6 +106,12 @@ function highlight(text, q) {
 function filterEmpList() {
   const q = document.getElementById("emp-search")?.value || "";
   renderEmpGrid(q);
+}
+
+function selectEmployeeFromList(el) {
+  const safeKey = el.getAttribute("data-empkey");
+  const key = decodeURIComponent(safeKey);
+  selectEmployee(key);
 }
 
 function selectEmployee(key) {
@@ -1523,8 +1531,18 @@ function closeGeoBlockModal() {
 }
 
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV37";
+const APP_VERSION = "DV38";
 const VERSION_HISTORY = [
+  {
+    version: "DV38",
+    date: "2026-08-04",
+    status: "current",
+    changes: [
+      "Fixed wrong employee showing in PIN screen when searching by name",
+      "Employee keys with special characters no longer break onclick handler",
+      "Switched to data-empkey attribute with URL encoding for safe key passing",
+    ]
+  },
   {
     version: "DV37",
     date: "2026-08-03",
