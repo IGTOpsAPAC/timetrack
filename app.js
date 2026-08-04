@@ -9,6 +9,21 @@ function nameToKey(name) {
   return "emp_" + name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "_");
 }
 
+// Ensure time is always a string in HH:MM format
+// Excel sometimes sends decimals e.g. 0.375 instead of "09:00"
+function formatTimeStr(val) {
+  if (!val && val !== 0) return "";
+  if (typeof val === "string" && /^\d{1,2}:\d{2}/.test(val)) return val; // already HH:MM
+  if (typeof val === "number") {
+    // Excel decimal time: 0.375 = 9:00 AM (fraction of 24 hours)
+    const totalMins = Math.round(val * 24 * 60);
+    const h = Math.floor(totalMins / 60);
+    const m = totalMins % 60;
+    return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
+  }
+  return String(val);
+}
+
 
 let selectedEmpKey = null, pinBuffer = "", adminPinBuffer = "";
 let editingEmpKey = null, isAdminUnlocked = false;
@@ -1554,8 +1569,20 @@ function closeGeoBlockModal() {
 }
 
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV43";
+const APP_VERSION = "DV44";
 const VERSION_HISTORY = [
+  {
+    version: "DV44",
+    date: "2026-08-04",
+    status: "current",
+    changes: [
+      "Fixed Std Start/End showing 0.375 instead of 09:00 in SharePoint Excel",
+      "Added formatTimeStr() — converts Excel decimal times to HH:MM format",
+      "Fixed #NAME? error in Start Variance column — times now sent as strings",
+      "PIN removed from SharePoint Excel Employees sheet — stored locally only",
+      "Employee sync reads times through formatTimeStr for consistent format",
+    ]
+  },
   {
     version: "DV43",
     date: "2026-08-04",
@@ -2726,8 +2753,8 @@ async function syncEmployeesFromSharePoint(silent = false) {
         empId:     r.EmployeeID   || "",
         area:      r["Work Area"] || r.Area || "",
         status:    r["Employment Status"] || r.Status || "Permanent",
-        startTime: r["Std Start"] || r.StartTime || "07:00",
-        endTime:   r["Std End"]   || r.EndTime   || "15:30",
+        startTime: formatTimeStr(r["Std Start"] || r.StartTime) || "07:00",
+        endTime:   formatTimeStr(r["Std End"]   || r.EndTime)   || "15:30",
         hours:     parseFloat(r["Hours Per Day"] || r.HoursPerDay || 8),
         lunchMins: parseInt(r["Lunch Break (min)"] || r.LunchMins || 30),
         pin:       r.PIN          || "0000",
@@ -2764,6 +2791,7 @@ async function syncEmployeesFromSharePoint(silent = false) {
 async function saveEmployeeToSharePoint(emp) {
   if (!emp) return;
   // Write employee to EmployeesTable via Read Employees flow (saveEmployee action)
+  // Note: PIN is NOT sent to SharePoint for security
   try {
     const resp = await fetch(PA_READ_EMPLOYEES_URL, {
       method: "POST",
@@ -2775,11 +2803,11 @@ async function saveEmployeeToSharePoint(emp) {
         EmployeeID:       emp.empId      || "",
         WorkArea:         emp.area       || "",
         EmploymentStatus: emp.status     || "Permanent",
-        StdStart:         emp.startTime  || "07:00",
-        StdEnd:           emp.endTime    || "15:30",
+        StdStart:         formatTimeStr(emp.startTime) || "07:00",
+        StdEnd:           formatTimeStr(emp.endTime)   || "15:30",
         HoursPerDay:      emp.hours      || 8,
         LunchMins:        emp.lunchMins  || 30,
-        PIN:              emp.pin        || "0000",
+        // PIN deliberately excluded — stored locally only
       }),
     });
     if (resp.ok || resp.status === 202) {
@@ -2797,7 +2825,6 @@ async function saveEmployeeToSharePoint(emp) {
 const PA_EXCEL_URL = "https://default3c259ff8b3a9490ca23979b422db62.eb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/bff81414b8ef4af683e7f907f576389c/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=QqzFgS4fbuNMcAq04YeQZUk3HSnIkQB1k3zqleTqZHo";
 
 async function writeClockEntryToExcel(entry) {
-  // Calculate variances for the record
   const actual  = calcHours(entry.timeIn, entry.timeOut, entry.lunchMins);
   const diff    = actual !== null ? +(actual - entry.stdHours).toFixed(2) : null;
   const inVar   = timeDiffStr(entry.stdStart, entry.timeIn) || "";
@@ -2806,6 +2833,7 @@ async function writeClockEntryToExcel(entry) {
     ? (diff !== null && diff >= 0 ? "On time" : "Short hours")
     : entry.timeIn ? "In progress" : "Absent";
 
+  // Ensure all time values are HH:MM strings — Excel sometimes converts to decimals
   const payload = {
     action:     entry.timeOut ? "clockout" : "clockin",
     empKey:     entry.empKey     || "",
@@ -2813,10 +2841,10 @@ async function writeClockEntryToExcel(entry) {
     empId:      entry.empId      || "",
     area:       entry.area       || "",
     date:       entry.date       || "",
-    timeIn:     entry.timeIn     || "",
-    timeOut:    entry.timeOut    || "",
-    stdStart:   entry.stdStart   || "",
-    stdEnd:     entry.stdEnd     || "",
+    timeIn:     formatTimeStr(entry.timeIn)    || "",
+    timeOut:    formatTimeStr(entry.timeOut)   || "",
+    stdStart:   formatTimeStr(entry.stdStart)  || "",
+    stdEnd:     formatTimeStr(entry.stdEnd)    || "",
     stdHours:   entry.stdHours   || 8,
     lunchMins:  entry.lunchMins  || 0,
     status:     entry.status     || "Permanent",
