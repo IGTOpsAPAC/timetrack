@@ -1647,9 +1647,104 @@ function closeGeoBlockModal() {
   showScreen("screen-login");
 }
 
+async function pushAllEmployeesToSharePoint() {
+  const logEl = document.getElementById("emp-sync-log");
+  if (logEl) logEl.textContent = "Checking existing employees in SharePoint...";
+
+  try {
+    // First get existing employees from SharePoint
+    const resp = await fetch(PA_READ_EMPLOYEES_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "getEmployees" }),
+    });
+
+    let existingNames = [];
+    if (resp.ok) {
+      const data = await resp.json();
+      const rows = data.value || data || [];
+      existingNames = rows.map(r => (r.Title || r["Employee Name"] || "").toLowerCase()).filter(Boolean);
+      console.log("[Push Employees] Existing in SP:", existingNames);
+    }
+
+    // Find duplicates
+    const duplicates = employees.filter(e => existingNames.includes(e.name.toLowerCase()));
+    const newEmps    = employees.filter(e => !existingNames.includes(e.name.toLowerCase()));
+
+    if (logEl) logEl.textContent = `Found ${newEmps.length} new, ${duplicates.length} already exist in SharePoint.`;
+
+    let overwriteAll = false;
+    let skipAll = false;
+
+    if (duplicates.length > 0) {
+      const dupNames = duplicates.map(e => `• ${e.name}`).join("\n");
+      const choice = confirm(
+        `${duplicates.length} employee(s) already exist in SharePoint:\n\n${dupNames}\n\nClick OK to overwrite all existing employees.\nClick Cancel to skip existing and only add new ones.`
+      );
+      overwriteAll = choice;
+      skipAll = !choice;
+    }
+
+    // Push employees
+    let pushed = 0, skipped = 0, failed = 0;
+    const toPush = overwriteAll ? employees : newEmps;
+
+    for (const emp of toPush) {
+      if (logEl) logEl.textContent = `Pushing ${emp.name}... (${pushed + 1}/${toPush.length})`;
+      try {
+        const r = await fetch(PA_READ_EMPLOYEES_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action:           "saveEmployee",
+            EmpKey:           emp.key        || "",
+            EmployeeName:     emp.name       || "",
+            EmployeeID:       emp.empId      || "",
+            WorkArea:         emp.area       || "",
+            EmploymentStatus: emp.status     || "Permanent",
+            StdStart:         formatTimeStr(emp.startTime) || "07:00",
+            StdEnd:           formatTimeStr(emp.endTime)   || "15:30",
+            HoursPerDay:      emp.hours      || 8,
+            LunchMins:        emp.lunchMins  || 30,
+          }),
+        });
+        if (r.ok || r.status === 202) pushed++;
+        else { failed++; console.warn("[Push Employees] Failed:", emp.name, r.status); }
+      } catch(e) {
+        failed++;
+        console.warn("[Push Employees] Error:", emp.name, e.message);
+      }
+      // Small delay to avoid rate limiting
+      await new Promise(r => setTimeout(r, 300));
+    }
+
+    if (skipAll) skipped = duplicates.length;
+
+    const msg = `✓ Done — ${pushed} pushed, ${skipped} skipped, ${failed} failed`;
+    if (logEl) logEl.textContent = msg;
+    toast(msg, pushed > 0 ? "success" : "error");
+
+  } catch(e) {
+    const msg = "✗ Failed to check SharePoint: " + e.message;
+    if (logEl) logEl.textContent = msg;
+    toast(msg, "error");
+  }
+}
+
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV54";
+const APP_VERSION = "DV55";
 const VERSION_HISTORY = [
+  {
+    version: "DV55",
+    date: "2026-08-04",
+    status: "current",
+    changes: [
+      "Push all employees to SharePoint button in Admin settings",
+      "Checks existing employees in SharePoint before pushing",
+      "Asks to overwrite or skip if duplicates found",
+      "Shows progress and result count after push",
+    ]
+  },
   {
     version: "DV54",
     date: "2026-08-04",

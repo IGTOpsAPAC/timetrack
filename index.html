@@ -257,7 +257,7 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--text3);border
     </div>
     <div id="emp-grid"></div>
     <div class="admin-link" onclick="showAdminLogin()">⚙ Admin access</div>
-    <div class="login-footer">IGT APAC Manufacturing Operations · <strong>DV54</strong></div>
+    <div class="login-footer">IGT APAC Manufacturing Operations · <strong>DV55</strong></div>
   </div>
 </div>
 
@@ -428,6 +428,13 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--text3);border
               <button class="btn" onclick="spPullAll()">⬇ Pull from SharePoint</button>
               <button class="btn btn-primary" onclick="spPushAll()">⬆ Push to SharePoint</button>
             </div>
+            <div class="divider"></div>
+            <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:.5rem">Employee List Sync</div>
+            <div style="font-size:12px;color:var(--text2);margin-bottom:.75rem">Push all employees currently in the app to the SharePoint Employees List.</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-primary" onclick="pushAllEmployeesToSharePoint()">⬆ Push all employees to SharePoint</button>
+            </div>
+            <div id="emp-sync-log" style="font-size:12px;color:var(--text2);margin-top:.5rem"></div>
             <div id="sp-sync-log" style="font-size:12px;color:var(--text2)"></div>
             <div class="divider"></div>
             <div class="card-section-header">Report Settings</div>
