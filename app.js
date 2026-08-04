@@ -210,7 +210,10 @@ function verifyPin() {
   if (pinBuffer.toUpperCase() === (emp.pin || "").toUpperCase()) {
     showScreen("screen-app");
     showSection("clock", document.querySelector(".nav-btn"));
-    performClockAction(emp.key);
+    // Check geo-fence before performing clock action
+    checkGeoFence().then(allowed => {
+      if (allowed) performClockAction(emp.key);
+    });
   } else {
     pinBuffer = "";
     updatePinDots("pin-dots", 4, "error");
@@ -681,6 +684,7 @@ function loadSettingsForm() {
   updateLastBackupTime();
   renderSchedulesList();
   renderLatestVersion();
+  loadGeoSettingsForm();
 }
 
 function saveSettings() {
@@ -1093,7 +1097,6 @@ function stopScanner() {
 }
 
 function handleBarcodeScan(text) {
-  // QR code contains employee key prefixed with "IGT-EMP:"
   stopScanner();
   if (!text.startsWith("IGT-EMP:")) {
     toast("Invalid barcode — not an IGT employee code", "error");
@@ -1105,9 +1108,11 @@ function handleBarcodeScan(text) {
     toast("Employee not found — barcode may be outdated", "error");
     return;
   }
-  // Success — beep and proceed
   playBeep();
-  selectEmployee(empKey);
+  // Check geo-fence before proceeding
+  checkGeoFence().then(allowed => {
+    if (allowed) selectEmployee(empKey);
+  });
 }
 
 function playBeep() {
@@ -1387,9 +1392,153 @@ function backupLog(msg) {
   while (el.children.length > 5) el.removeChild(el.lastChild);
 }
 
+// ── Geo-Fencing ───────────────────────────────────────────────
+function toggleGeoFields() {
+  const enabled = document.getElementById("cfg-geo-enabled").checked;
+  document.getElementById("geo-fields").style.display = enabled ? "block" : "none";
+  document.getElementById("cfg-geo-label").textContent = enabled ? "Enabled" : "Disabled";
+}
+
+function loadGeoSettingsForm() {
+  const geoEnabled = settings.geoEnabled === true;
+  const geoCheck   = document.getElementById("cfg-geo-enabled");
+  const geoLabel   = document.getElementById("cfg-geo-label");
+  const geoFields  = document.getElementById("geo-fields");
+  if (geoCheck)  geoCheck.checked = geoEnabled;
+  if (geoLabel)  geoLabel.textContent = geoEnabled ? "Enabled" : "Disabled";
+  if (geoFields) geoFields.style.display = geoEnabled ? "block" : "none";
+  const latEl    = document.getElementById("cfg-geo-lat");
+  const lngEl    = document.getElementById("cfg-geo-lng");
+  const radEl    = document.getElementById("cfg-geo-radius");
+  if (latEl && settings.geoLat) latEl.value = settings.geoLat;
+  if (lngEl && settings.geoLng) lngEl.value = settings.geoLng;
+  if (radEl && settings.geoRadius) radEl.value = settings.geoRadius;
+}
+
+function saveGeoSettings() {
+  settings.geoEnabled = document.getElementById("cfg-geo-enabled").checked;
+  settings.geoLat     = parseFloat(document.getElementById("cfg-geo-lat").value) || null;
+  settings.geoLng     = parseFloat(document.getElementById("cfg-geo-lng").value) || null;
+  settings.geoRadius  = parseInt(document.getElementById("cfg-geo-radius").value) || 100;
+  saveLocal();
+  toast(`Geo-fencing ${settings.geoEnabled ? "enabled" : "disabled"} — radius: ${settings.geoRadius}m`, "success");
+}
+
+function useCurrentLocation() {
+  const statusEl = document.getElementById("geo-status");
+  statusEl.textContent = "Getting your location…";
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      document.getElementById("cfg-geo-lat").value = pos.coords.latitude.toFixed(6);
+      document.getElementById("cfg-geo-lng").value = pos.coords.longitude.toFixed(6);
+      statusEl.textContent = `✓ Location set: ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)} (accuracy: ±${Math.round(pos.coords.accuracy)}m)`;
+      statusEl.style.color = "var(--igt-blue)";
+    },
+    err => {
+      statusEl.textContent = "✗ Location error: " + err.message;
+      statusEl.style.color = "red";
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+
+function testGeoLocation() {
+  const statusEl = document.getElementById("geo-status");
+  if (!settings.geoLat || !settings.geoLng) {
+    statusEl.textContent = "✗ Set premises location first";
+    statusEl.style.color = "red";
+    return;
+  }
+  statusEl.textContent = "Getting your location…";
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const dist = getDistance(pos.coords.latitude, pos.coords.longitude, settings.geoLat, settings.geoLng);
+      const radius = settings.geoRadius || 100;
+      const inside = dist <= radius;
+      statusEl.textContent = `${inside ? "✓ Inside" : "✗ Outside"} premises — you are ${Math.round(dist)}m away (allowed: ${radius}m)`;
+      statusEl.style.color = inside ? "var(--igt-blue)" : "red";
+    },
+    err => {
+      statusEl.textContent = "✗ Location error: " + err.message;
+      statusEl.style.color = "red";
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+
+// Haversine formula — distance in metres between two GPS coordinates
+function getDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371000; // Earth radius in metres
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// Check if employee is within geo-fence — returns Promise<boolean>
+function checkGeoFence() {
+  return new Promise((resolve) => {
+    // Skip check if geo-fencing disabled or not configured
+    if (!settings.geoEnabled || !settings.geoLat || !settings.geoLng) {
+      resolve(true);
+      return;
+    }
+    if (!navigator.geolocation) {
+      toast("Location not supported on this device — geo-fence bypassed", "");
+      resolve(true);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const dist = getDistance(pos.coords.latitude, pos.coords.longitude, settings.geoLat, settings.geoLng);
+        const radius = settings.geoRadius || 100;
+        if (dist <= radius) {
+          resolve(true);
+        } else {
+          // Show blocked modal
+          const msg = document.getElementById("geo-block-msg");
+          const distEl = document.getElementById("geo-block-distance");
+          if (msg) msg.textContent = "You must be on the premises to clock in or out. Please return to the workplace and try again.";
+          if (distEl) distEl.textContent = `You are ${Math.round(dist)}m away — allowed radius is ${radius}m`;
+          document.getElementById("geo-block-modal").classList.add("open");
+          resolve(false);
+        }
+      },
+      err => {
+        // On error — allow clock in (fail open so employees aren't locked out)
+        console.warn("Geo location error:", err.message);
+        toast("Location check failed — clock in allowed", "");
+        resolve(true);
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+    );
+  });
+}
+
+function closeGeoBlockModal() {
+  document.getElementById("geo-block-modal").classList.remove("open");
+  showScreen("screen-login");
+}
+
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV36";
+const APP_VERSION = "DV37";
 const VERSION_HISTORY = [
+  {
+    version: "DV37",
+    date: "2026-08-03",
+    status: "current",
+    changes: [
+      "Geo-fencing — employees can only clock in/out when physically on premises",
+      "Admin sets premises GPS coordinates and allowed radius (50m to 1km)",
+      "Use current location button auto-fills premises coordinates",
+      "Test location button shows how far you are from premises",
+      "Blocked employees see distance and allowed radius in popup",
+      "Works with PIN, barcode and Face ID login methods",
+      "Fails open — if GPS unavailable, clock in is still allowed",
+    ]
+  },
   {
     version: "DV36",
     date: "2026-08-03",
