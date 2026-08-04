@@ -56,8 +56,8 @@ function loadLocal() {
   employees = JSON.parse(localStorage.getItem("tt_employees") || "[]");
   clockEntries = JSON.parse(localStorage.getItem("tt_entries") || "[]");
   settings = JSON.parse(localStorage.getItem("tt_settings") || "{}");
-  if (!employees.length) {
-    employees = []; // Start empty — employees load from SharePoint on first sync
+  if (!employees.length && !Object.keys(settings).length) {
+    // Only reset settings if truly first run (no settings at all)
     settings = { adminPin:"0000", areas:"Gaming Assembly,Fintech Assembly,Repair Centre,Warehouse,Operations Support", company:"IGT APAC Manufacturing", recipientName:"Operations Manager", recipientEmail:"manager@igt.com", siteName:"APACManufacturingOperationsTeam", filePath:"General/ATTENDANCE/Attendance.xlsx", defaultLunch:30 };
     saveLocal();
   }
@@ -1569,8 +1569,19 @@ function closeGeoBlockModal() {
 }
 
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV44";
+const APP_VERSION = "DV45";
 const VERSION_HISTORY = [
+  {
+    version: "DV45",
+    date: "2026-08-04",
+    status: "current",
+    changes: [
+      "Fixed feature toggles not persisting — settings no longer reset when employees array is empty",
+      "Toggle state (Face ID off, Barcode off) now survives app reload and SharePoint sync",
+      "Fixed Std Start/End decimal format — formatTimeStr converts 0.375 to 09:00",
+      "Settings only reset on true first run (no settings exist at all)",
+    ]
+  },
   {
     version: "DV44",
     date: "2026-08-04",
