@@ -14,9 +14,11 @@ function nameToKey(name) {
 function formatTimeStr(val) {
   if (!val && val !== 0) return "";
   if (typeof val === "string" && /^\d{1,2}:\d{2}/.test(val)) return val; // already HH:MM
-  if (typeof val === "number") {
+  // Handle both number and string decimals e.g. 0.375 or "0.375"
+  const num = typeof val === "number" ? val : parseFloat(val);
+  if (!isNaN(num) && num >= 0 && num < 1) {
     // Excel decimal time: 0.375 = 9:00 AM (fraction of 24 hours)
-    const totalMins = Math.round(val * 24 * 60);
+    const totalMins = Math.round(num * 24 * 60);
     const h = Math.floor(totalMins / 60);
     const m = totalMins % 60;
     return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
@@ -1576,8 +1578,18 @@ function closeGeoBlockModal() {
 }
 
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV48";
+const APP_VERSION = "DV49";
 const VERSION_HISTORY = [
+  {
+    version: "DV49",
+    date: "2026-08-04",
+    status: "current",
+    changes: [
+      "Fixed time decimal conversion — Power Automate returns 0.375 as a STRING not number",
+      "formatTimeStr now handles both numeric 0.375 and string \"0.375\" formats",
+      "Std Start and Std End will now show 09:00 instead of 0.375 in SharePoint Excel",
+    ]
+  },
   {
     version: "DV48",
     date: "2026-08-04",
