@@ -1576,8 +1576,18 @@ function closeGeoBlockModal() {
 }
 
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV47";
+const APP_VERSION = "DV48";
 const VERSION_HISTORY = [
+  {
+    version: "DV48",
+    date: "2026-08-04",
+    status: "current",
+    changes: [
+      "Fixed critical syntax error — duplicate map block caused app to break completely",
+      "showAdminLogin and filterEmpList errors resolved",
+      "Debug logging intact — console shows column names and raw time values from SharePoint",
+    ]
+  },
   {
     version: "DV47",
     date: "2026-08-04",
@@ -2781,14 +2791,10 @@ async function syncEmployeesFromSharePoint(silent = false) {
     }
 
     // Map Excel columns to app employee format
-    const synced = rows.map(r => {
-      const name = r["Employee Name"] || r.EmployeeName || "";
-      if (!name) return null;
-      // Generate stable key from name — same name always gets same key
-      // Debug — log first row to see exact column names
-      if (rows.length) console.log("[PA Employees] Column names:", Object.keys(rows[0]));
+    // Debug — log first row column names to console
+    if (rows.length) console.log("[PA Employees] Column names:", Object.keys(rows[0]));
 
-      const synced = rows.map(r => {
+    const synced = rows.map(r => {
       const name = r["Employee Name"] || r.EmployeeName || r.Title || "";
       if (!name) return null;
       const stableKey = nameToKey(name);
