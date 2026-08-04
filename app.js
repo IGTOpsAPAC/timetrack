@@ -1648,8 +1648,16 @@ function closeGeoBlockModal() {
 }
 
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV53";
+const APP_VERSION = "DV54";
 const VERSION_HISTORY = [
+  {
+    version: "DV54",
+    date: "2026-08-04",
+    status: "current",
+    changes: [
+      "Fixed TriggerInputSchemaMismatch — itemId sent as string not integer",
+    ]
+  },
   {
     version: "DV53",
     date: "2026-08-04",
@@ -3022,7 +3030,7 @@ async function writeClockEntryToExcel(entry) {
 
   const payload = {
     action:           isClockin ? "clockin" : "clockout",
-    itemId:           entry.spItemId || 0,
+    itemId:           String(entry.spItemId || "0"),
     empKey:           entry.empKey     || "",
     empName:          entry.name       || "",
     empId:            entry.empId      || "",
