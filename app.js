@@ -348,7 +348,7 @@ function performClockAction(empKey) {
     </div>`;
     toast(`${emp.name} clocked out at ${timeStamp}`,"success");
   } else {
-    clockEntries.push({ empKey, date:today(), timeIn:timeStamp, timeOut:null, name:emp.name, area:emp.area, empId:emp.empId, stdStart:emp.startTime, stdEnd:emp.endTime, stdHours:emp.hours, lunchMins:emp.lunchMins||settings.defaultLunch||30, status:emp.status||"Permanent" });
+    clockEntries.push({ empKey, date:today(), timeIn:timeStamp, timeOut:null, name:emp.name, area:emp.area, empId:emp.empId, stdStart:formatTimeStr(emp.startTime), stdEnd:formatTimeStr(emp.endTime), stdHours:emp.hours, lunchMins:emp.lunchMins||settings.defaultLunch||30, status:emp.status||"Permanent" });
     saveLocal();
     const h = new Date().getHours();
     const greet = h<12?"morning":h<17?"afternoon":"evening";
@@ -372,7 +372,7 @@ function performClockAction(empKey) {
 function forceClockIn(empKey) {
   const emp = employees.find(e => e.key === empKey);
   const t = new Date().toLocaleTimeString("en-AU", {hour:"2-digit", minute:"2-digit", hour12:false});
-  const newEntry = {empKey, date:today(), timeIn:t, timeOut:null, name:emp.name, area:emp.area, empId:emp.empId, stdStart:emp.startTime, stdEnd:emp.endTime, stdHours:emp.hours, lunchMins:emp.lunchMins||settings.defaultLunch||30, status:emp.status||"Permanent"};
+  const newEntry = {empKey, date:today(), timeIn:t, timeOut:null, name:emp.name, area:emp.area, empId:emp.empId, stdStart:formatTimeStr(emp.startTime), stdEnd:formatTimeStr(emp.endTime), stdHours:emp.hours, lunchMins:emp.lunchMins||settings.defaultLunch||30, status:emp.status||"Permanent"};
   clockEntries.push(newEntry);
   saveLocal();
   writeClockEntryToExcel(newEntry);
@@ -408,17 +408,24 @@ function renderTodayTable() {
 
 function calcHours(tin, tout, lunchMins) {
   if (!tin || !tout) return null;
-  const [h1,m1] = tin.split(":").map(Number);
-  const [h2,m2] = tout.split(":").map(Number);
+  const t1 = formatTimeStr(tin), t2 = formatTimeStr(tout);
+  const [h1,m1] = t1.split(":").map(Number);
+  const [h2,m2] = t2.split(":").map(Number);
   const raw = (h2*60+m2 - h1*60-m1) / 60;
   const lb = (lunchMins !== undefined ? lunchMins : (settings.defaultLunch || 30)) / 60;
   return Math.max(0, raw - lb);
 }
 
-function timeDiffStr(t1,t2) {
-  if(!t1||!t2) return null;
-  const [h1,m1]=t1.split(":").map(Number),[h2,m2]=t2.split(":").map(Number);
-  const diff=(h2*60+m2)-(h1*60+m1),sign=diff<0?"-":"+",abs=Math.abs(diff);
+function timeDiffStr(t1, t2) {
+  if (!t1 || !t2) return null;
+  const s1 = formatTimeStr(t1), s2 = formatTimeStr(t2);
+  if (!s1 || !s2) return null;
+  const [h1,m1] = s1.split(":").map(Number);
+  const [h2,m2] = s2.split(":").map(Number);
+  if (isNaN(h1)||isNaN(m1)||isNaN(h2)||isNaN(m2)) return null;
+  const diff = (h2*60+m2) - (h1*60+m1);
+  const sign = diff < 0 ? "-" : "+";
+  const abs  = Math.abs(diff);
   return `${sign}${Math.floor(abs/60)}h ${abs%60}m`;
 }
 
@@ -1569,8 +1576,19 @@ function closeGeoBlockModal() {
 }
 
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV45";
+const APP_VERSION = "DV46";
 const VERSION_HISTORY = [
+  {
+    version: "DV46",
+    date: "2026-08-04",
+    status: "current",
+    changes: [
+      "Fixed decimal time in Std Start/End — formatTimeStr applied at clock entry creation",
+      "calcHours and timeDiffStr now decimal-safe — handle both 0.375 and 09:00 formats",
+      "Fixed NaNh NaNm variance — caused by decimal times reaching timeDiffStr",
+      "Clock entries always store times as HH:MM strings from creation",
+    ]
+  },
   {
     version: "DV45",
     date: "2026-08-04",
