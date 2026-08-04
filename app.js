@@ -3,6 +3,13 @@
 // ============================================================
 
 let employees = [], clockEntries = [], settings = {};
+
+// ── Name-based key helper ─────────────────────────────────────
+function nameToKey(name) {
+  return "emp_" + name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "_");
+}
+
+
 let selectedEmpKey = null, pinBuffer = "", adminPinBuffer = "";
 let editingEmpKey = null, isAdminUnlocked = false;
 
@@ -35,11 +42,7 @@ function loadLocal() {
   clockEntries = JSON.parse(localStorage.getItem("tt_entries") || "[]");
   settings = JSON.parse(localStorage.getItem("tt_settings") || "{}");
   if (!employees.length) {
-    employees = [
-      { key:"e1", name:"Alex Chen",    empId:"EMP001", area:"Production", startTime:"09:00", endTime:"17:00", hours:8, pin:"A1234" },
-      { key:"e2", name:"Jordan Smith", empId:"EMP002", area:"Warehouse",  startTime:"08:00", endTime:"16:00", hours:8, pin:"B2345" },
-      { key:"e3", name:"Sam Patel",    empId:"EMP003", area:"Office",     startTime:"07:00", endTime:"15:00", hours:8, pin:"C3456" },
-    ];
+    employees = []; // Start empty — employees load from SharePoint on first sync
     settings = { adminPin:"0000", areas:"Gaming Assembly,Fintech Assembly,Repair Centre,Warehouse,Operations Support", company:"IGT APAC Manufacturing", recipientName:"Operations Manager", recipientEmail:"manager@igt.com", siteName:"APACManufacturingOperationsTeam", filePath:"General/ATTENDANCE/Attendance.xlsx", defaultLunch:30 };
     saveLocal();
   }
@@ -67,7 +70,7 @@ function renderEmpGrid(filter) {
   const q = filter.toLowerCase().trim();
   if (!q) { g.innerHTML = ""; return; }
   const filtered = employees.filter(e =>
-    e.name.toLowerCase().includes(q) || e.empId.toLowerCase().includes(q) || e.area.toLowerCase().includes(q)
+    e.name.toLowerCase().includes(q) || (e.empId||"").toLowerCase().includes(q) || (e.area||"").toLowerCase().includes(q)
   );
   if (!filtered.length) {
     g.innerHTML = '<div class="emp-list-wrap"><div class="emp-empty">No employees match your search.</div></div>';
@@ -83,7 +86,7 @@ function renderEmpGrid(filter) {
       ? '<span class="badge badge-gray" style="font-size:11px">✓ Done</span>'
       : '<span class="badge badge-amber" style="font-size:11px">○ Not in</span>';
     // Use data-key attribute to avoid quote escaping issues with special characters in keys
-    const safeKey = encodeURIComponent(e.key);
+    const safeKey = encodeURIComponent(nameToKey(e.name));
     return `<div class="emp-list-item" data-empkey="${safeKey}" onclick="selectEmployeeFromList(this)">
       <div class="emp-avatar" style="${avatarStyle(i)};width:40px;height:40px;font-size:14px;flex-shrink:0">${initials(e.name)}</div>
       <div class="emp-item-info">
@@ -109,16 +112,18 @@ function filterEmpList() {
 }
 
 function selectEmployeeFromList(el) {
-  // Walk up DOM tree to find element with data-empkey (in case a child was clicked)
   let target = el;
   while (target && !target.getAttribute("data-empkey")) {
     target = target.parentElement;
   }
   if (!target) { console.error("No data-empkey found"); return; }
-  const safeKey = target.getAttribute("data-empkey");
-  const key = decodeURIComponent(safeKey);
-  console.log("[Select] key:", key, "name:", employees.find(e=>e.key===key)?.name);
-  selectEmployee(key);
+  const key = decodeURIComponent(target.getAttribute("data-empkey"));
+  // Find by key first, then by name-derived key as fallback
+  let emp = employees.find(e => e.key === key);
+  if (!emp) emp = employees.find(e => nameToKey(e.name) === key);
+  if (!emp) { console.error("Employee not found for key:", key); return; }
+  console.log("[Select] key:", emp.key, "name:", emp.name);
+  selectEmployee(emp.key);
 }
 
 function selectEmployee(key) {
@@ -657,7 +662,8 @@ function saveEmployee(forceOverwrite = false) {
       return;
     }
   }
-  const emp = { key: editingEmpKey ? employees.find(e=>e.key===editingEmpKey).key : "e"+Date.now(), name, empId, area, startTime, endTime, hours, pin, lunchMins, status };
+  const empKey = editingEmpKey || nameToKey(name);
+  const emp = { key: empKey, name, empId, area, startTime, endTime, hours, pin, lunchMins, status };
   // Handle face descriptor
   if (window._pendingFaceDescriptor) emp.faceDescriptor = window._pendingFaceDescriptor;
   else if (!window._clearFaceDescriptor && editingEmpKey) {
@@ -826,7 +832,7 @@ function parseImportFile(buffer) {
     }
 
     parsed.push({
-      key: existing ? existing.key : "e" + Date.now() + Math.random().toString(36).slice(2,6),
+      key: existing ? existing.key : nameToKey(name),
       name, area, status,
       empId: existing ? existing.empId : empId,
       startTime: monThuTimes[0], endTime: monThuTimes[1],
@@ -1538,8 +1544,32 @@ function closeGeoBlockModal() {
 }
 
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV40";
+const APP_VERSION = "DV42";
 const VERSION_HISTORY = [
+  {
+    version: "DV42",
+    date: "2026-08-04",
+    status: "current",
+    changes: [
+      "Eliminated employee keys — name is now the unique identifier",
+      "nameToKey() converts name to stable key e.g. Arvin Joya → emp_arvin_joya",
+      "No more random key generation — same name always maps to same key",
+      "SharePoint sync, import, add employee all use name-based keys",
+      "Duplicate key conflicts impossible since keys derive from unique names",
+    ]
+  },
+  {
+    version: "DV41",
+    date: "2026-08-04",
+    status: "current",
+    changes: [
+      "Fixed duplicate employee keys — e5 was shared by John Wu and Arvin Joya",
+      "Removed default sample employees (Alex Chen, Jordan Smith etc) — caused key conflicts",
+      "App now starts empty and loads employees from SharePoint on first sync",
+      "Duplicate key detection — new employees get unique key if their key is already taken",
+      "Match by name first then Employee ID for reliable merging",
+    ]
+  },
   {
     version: "DV40",
     date: "2026-08-04",
@@ -2669,7 +2699,7 @@ async function syncEmployeesFromSharePoint(silent = false) {
       const name = r["Employee Name"] || r.EmployeeName || "";
       if (!name) return null;
       // Generate stable key from name — same name always gets same key
-      const stableKey = r.EmpKey || "emp_" + name.toLowerCase().replace(/[^a-z0-9]/g, "_");
+      const stableKey = nameToKey(name);
       return {
         key:       stableKey,
         name,
@@ -2686,14 +2716,12 @@ async function syncEmployeesFromSharePoint(silent = false) {
     }).filter(e => e && e.name);
 
     if (synced.length) {
-      // Merge — preserve local keys, PINs and face descriptors
+      // Use name as unique identifier — always generate key from name
       synced.forEach(sp => {
-        const local = employees.find(e =>
-          e.name.toLowerCase() === sp.name.toLowerCase() ||
-          (sp.empId && e.empId && e.empId.toLowerCase() === sp.empId.toLowerCase())
-        );
+        sp.key = nameToKey(sp.name); // Always derive key from name
+        // Find local record by name to preserve PIN and face data
+        const local = employees.find(e => e.name.toLowerCase() === sp.name.toLowerCase());
         if (local) {
-          sp.key = local.key; // ALWAYS keep local key to preserve attendance records
           sp.pin = (sp.pin && sp.pin !== "0000") ? sp.pin : local.pin;
           sp.faceDescriptor = sp.faceDescriptor || local.faceDescriptor;
         }
