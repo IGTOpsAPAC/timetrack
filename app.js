@@ -1648,8 +1648,18 @@ function closeGeoBlockModal() {
 }
 
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV52";
+const APP_VERSION = "DV53";
 const VERSION_HISTORY = [
+  {
+    version: "DV53",
+    date: "2026-08-04",
+    status: "current",
+    changes: [
+      "Fixed 401 auth error — Power Automate flows set to Anyone trigger",
+      "Updated full URLs with authentication signatures for both flows",
+      "SharePoint List attendance and employee sync should now work",
+    ]
+  },
   {
     version: "DV52",
     date: "2026-08-04",
@@ -2885,7 +2895,7 @@ async function spPullAll(silent = false) {
 
 
 // ── Power Automate — Read Employees from SharePoint Excel ─────
-const PA_READ_EMPLOYEES_URL = "https://default3c259ff8b3a9490ca23979b422db62.eb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/56975b038c324ba68e2e0b96de7ae820/triggers/manual/paths/invoke?api-version=1";
+const PA_READ_EMPLOYEES_URL = "https://default3c259ff8b3a9490ca23979b422db62.eb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/56975b038c324ba68e2e0b96de7ae820/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=4QxPerHxl7Sr1Mov63JdWekbaDns8BtwbAdb-Wz21o0";
 
 async function syncEmployeesFromSharePoint(silent = false) {
   if (!PA_READ_EMPLOYEES_URL) return;
@@ -2997,7 +3007,7 @@ async function saveEmployeeToSharePoint(emp) {
 }
 
 // ── Power Automate — SharePoint List Attendance ──────────────────
-const PA_EXCEL_URL = "https://default3c259ff8b3a9490ca23979b422db62.eb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/1756b4dffe0b4327a71bbda11a1ba967/triggers/manual/paths/invoke?api-version=1";
+const PA_EXCEL_URL = "https://default3c259ff8b3a9490ca23979b422db62.eb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/1756b4dffe0b4327a71bbda11a1ba967/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=fcNOpS7CPv8Q64HFfS8s5VdUP9ueM-axqmk4gzDAjK4";
 
 async function writeClockEntryToExcel(entry) {
   const actual  = calcHours(entry.timeIn, entry.timeOut, entry.lunchMins);
