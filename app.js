@@ -1538,8 +1538,19 @@ function closeGeoBlockModal() {
 }
 
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV39";
+const APP_VERSION = "DV40";
 const VERSION_HISTORY = [
+  {
+    version: "DV40",
+    date: "2026-08-04",
+    status: "current",
+    changes: [
+      "Fixed wrong employee in PIN screen — root cause was random keys on every SharePoint sync",
+      "Employee keys now generated from name (stable) — same employee always gets same key",
+      "Local keys always preserved when employee exists locally — attendance records stay linked",
+      "Merge logic improved — matches by name first, then Employee ID",
+    ]
+  },
   {
     version: "DV39",
     date: "2026-08-04",
@@ -2654,28 +2665,37 @@ async function syncEmployeesFromSharePoint(silent = false) {
     }
 
     // Map Excel columns to app employee format
-    const synced = rows.map(r => ({
-      key:       r.EmpKey       || "e" + Math.random().toString(36).slice(2,8),
-      name:      r["Employee Name"] || r.EmployeeName || "",
-      empId:     r.EmployeeID   || "",
-      area:      r["Work Area"] || r.Area || "",
-      status:    r["Employment Status"] || r.Status || "Permanent",
-      startTime: r["Std Start"] || r.StartTime || "07:00",
-      endTime:   r["Std End"]   || r.EndTime   || "15:30",
-      hours:     parseFloat(r["Hours Per Day"] || r.HoursPerDay || 8),
-      lunchMins: parseInt(r["Lunch Break (min)"] || r.LunchMins || 30),
-      pin:       r.PIN          || "0000",
-      faceDescriptor: r.FaceData ? JSON.parse(r.FaceData) : null,
-    })).filter(e => e.name);
+    const synced = rows.map(r => {
+      const name = r["Employee Name"] || r.EmployeeName || "";
+      if (!name) return null;
+      // Generate stable key from name — same name always gets same key
+      const stableKey = r.EmpKey || "emp_" + name.toLowerCase().replace(/[^a-z0-9]/g, "_");
+      return {
+        key:       stableKey,
+        name,
+        empId:     r.EmployeeID   || "",
+        area:      r["Work Area"] || r.Area || "",
+        status:    r["Employment Status"] || r.Status || "Permanent",
+        startTime: r["Std Start"] || r.StartTime || "07:00",
+        endTime:   r["Std End"]   || r.EndTime   || "15:30",
+        hours:     parseFloat(r["Hours Per Day"] || r.HoursPerDay || 8),
+        lunchMins: parseInt(r["Lunch Break (min)"] || r.LunchMins || 30),
+        pin:       r.PIN          || "0000",
+        faceDescriptor: r.FaceData ? JSON.parse(r.FaceData) : null,
+      };
+    }).filter(e => e && e.name);
 
     if (synced.length) {
-      // Merge — preserve local face descriptors and PINs if not in SharePoint
+      // Merge — preserve local keys, PINs and face descriptors
       synced.forEach(sp => {
-        const local = employees.find(e => e.empId === sp.empId || e.name.toLowerCase() === sp.name.toLowerCase());
+        const local = employees.find(e =>
+          e.name.toLowerCase() === sp.name.toLowerCase() ||
+          (sp.empId && e.empId && e.empId.toLowerCase() === sp.empId.toLowerCase())
+        );
         if (local) {
-          sp.pin = sp.pin !== "0000" ? sp.pin : local.pin;
+          sp.key = local.key; // ALWAYS keep local key to preserve attendance records
+          sp.pin = (sp.pin && sp.pin !== "0000") ? sp.pin : local.pin;
           sp.faceDescriptor = sp.faceDescriptor || local.faceDescriptor;
-          sp.key = local.key; // keep existing key for attendance records
         }
       });
       employees = synced;
