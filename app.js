@@ -399,13 +399,83 @@ function renderActiveBanner() {
 }
 
 function renderTodayTable() {
-  const entries=clockEntries.filter(e=>e.date===today());
-  const wrap=document.getElementById("today-table-wrap"); if(!wrap) return;
-  if(!entries.length){wrap.innerHTML='<div class="empty">⏰<br><br>No clock-ins recorded today</div>';return;}
-  wrap.innerHTML=`<div style="overflow-x:auto"><table><thead><tr><th>Employee</th><th>Area</th><th>Clock in</th><th>Clock out</th><th>Break</th><th>Net hours</th><th>Status</th></tr></thead><tbody>${entries.map(e=>{
-    const hrs=calcHours(e.timeIn,e.timeOut,e.lunchMins);
-    return `<tr><td><div class="emp-row"><div class="emp-avatar" style="${avatarStyle(employees.findIndex(x=>x.key===e.empKey))};width:30px;height:30px;font-size:11px">${initials(e.name)}</div><div><div style="font-weight:600">${e.name}</div><div style="font-size:11px;color:var(--text2)">${e.empId}</div></div></div></td><td><span class="tag">${e.area}</span></td><td><strong>${e.timeIn||"—"}</strong></td><td><strong>${e.timeOut||"—"}</strong></td><td style="font-size:12px;color:var(--text2)">${e.lunchMins||0}m</td><td>${hrs!==null?hrs.toFixed(1)+"h":"—"}</td><td>${e.timeOut?'<span class="badge badge-green">✓ Done</span>':'<span class="badge badge-amber">● Active</span>'}</td></tr>`;
+  const entries = clockEntries.filter(e => e.date === today());
+  const wrap = document.getElementById("today-table-wrap");
+  if (!wrap) return;
+  if (!entries.length) { wrap.innerHTML = '<div class="empty">⏰<br><br>No clock-ins recorded today</div>'; return; }
+  wrap.innerHTML = `<div style="overflow-x:auto"><table><thead><tr>
+    <th>Employee</th><th>Area</th><th>Clock in</th><th>Clock out</th><th>Break</th><th>Net hours</th><th>Status</th>
+    ${isAdminUnlocked ? '<th>Action</th>' : ''}
+  </tr></thead><tbody>${entries.map((e, idx) => {
+    const hrs = calcHours(e.timeIn, e.timeOut, e.lunchMins);
+    const globalIdx = clockEntries.indexOf(e);
+    const actionBtn = isAdminUnlocked ? `
+      <td>
+        <button class="btn" style="padding:4px 8px;font-size:11px;color:var(--igt-red);border-color:var(--igt-red)"
+          onclick="discardEntry(${globalIdx})">✕ Discard</button>
+      </td>` : '';
+    return `<tr>
+      <td><div class="emp-row"><div class="emp-avatar" style="${avatarStyle(employees.findIndex(x=>x.key===e.empKey))};width:30px;height:30px;font-size:11px">${initials(e.name)}</div>
+        <div><div style="font-weight:600">${e.name}</div><div style="font-size:11px;color:var(--text2)">${e.empId}</div></div></div></td>
+      <td><span class="tag">${e.area}</span></td>
+      <td><strong>${e.timeIn||"—"}</strong></td>
+      <td><strong>${e.timeOut||"—"}</strong></td>
+      <td style="font-size:12px;color:var(--text2)">${e.lunchMins||0}m</td>
+      <td>${hrs!==null ? hrs.toFixed(1)+"h" : "—"}</td>
+      <td>${e.timeOut ? '<span class="badge badge-green">✓ Done</span>' : '<span class="badge badge-amber">● Active</span>'}</td>
+      ${actionBtn}
+    </tr>`;
   }).join("")}</tbody></table></div>`;
+}
+
+function loadManageEntries() {
+  const date = document.getElementById("manage-date")?.value || today();
+  const wrap = document.getElementById("manage-entries-wrap");
+  if (!wrap) return;
+  const entries = clockEntries.filter(e => e.date === date);
+  if (!entries.length) {
+    wrap.innerHTML = `<div style="font-size:13px;color:var(--text2);padding:.5rem 0">No entries found for ${date}</div>`;
+    return;
+  }
+  wrap.innerHTML = `<div style="overflow-x:auto"><table>
+    <thead><tr><th>Employee</th><th>Area</th><th>Clock In</th><th>Clock Out</th><th>Hours</th><th>Status</th><th>Action</th></tr></thead>
+    <tbody>${entries.map(e => {
+      const idx = clockEntries.indexOf(e);
+      const hrs = calcHours(e.timeIn, e.timeOut, e.lunchMins);
+      return `<tr>
+        <td><strong>${e.name}</strong><br><span style="font-size:11px;color:var(--text2)">${e.empId||""}</span></td>
+        <td><span class="tag">${e.area}</span></td>
+        <td>${e.timeIn||"—"}</td>
+        <td>${e.timeOut||"—"}</td>
+        <td>${hrs!==null ? hrs.toFixed(1)+"h" : "—"}</td>
+        <td>${e.timeOut ? '<span class="badge badge-green">Done</span>' : '<span class="badge badge-amber">Active</span>'}</td>
+        <td>
+          <button class="btn" style="padding:4px 8px;font-size:11px;color:var(--igt-red);border-color:var(--igt-red)"
+            onclick="discardEntryByIdx(${idx}, '${date}')">✕ Discard</button>
+        </td>
+      </tr>`;
+    }).join("")}</tbody>
+  </table></div>
+  <div style="font-size:12px;color:var(--text2);margin-top:.5rem">${entries.length} entr${entries.length===1?"y":"ies"} on ${date}</div>`;
+}
+
+function discardEntryByIdx(idx, date) {
+  const entry = clockEntries[idx];
+  if (!entry) return;
+  const what = entry.timeOut
+    ? `full shift for ${entry.name} (${entry.timeIn} – ${entry.timeOut})`
+    : `clock in for ${entry.name} at ${entry.timeIn}`;
+  if (!confirm(`Discard ${what} on ${entry.date}?\n\nThis cannot be undone.`)) return;
+  clockEntries.splice(idx, 1);
+  saveLocal();
+  renderTodayTable();
+  renderActiveBanner();
+  loadManageEntries(); // refresh the manage table
+  toast(`✓ Entry discarded for ${entry.name}`, "success");
+}
+
+function discardEntry(idx) {
+  discardEntryByIdx(idx, today());
 }
 
 function calcHours(tin, tout, lunchMins) {
@@ -1578,8 +1648,19 @@ function closeGeoBlockModal() {
 }
 
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV49";
+const APP_VERSION = "DV50";
 const VERSION_HISTORY = [
+  {
+    version: "DV50",
+    date: "2026-08-04",
+    status: "current",
+    changes: [
+      "Admin can now discard clock entries — shown as red Discard button on today table",
+      "Attendance Entry Management section in Admin — search any date and discard entries",
+      "Discard confirms before removing — shows employee name, time and date",
+      "Discarded entries removed from local storage immediately",
+    ]
+  },
   {
     version: "DV49",
     date: "2026-08-04",

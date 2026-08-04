@@ -257,7 +257,7 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--text3);border
     </div>
     <div id="emp-grid"></div>
     <div class="admin-link" onclick="showAdminLogin()">⚙ Admin access</div>
-    <div class="login-footer">IGT APAC Manufacturing Operations · <strong>DV49</strong></div>
+    <div class="login-footer">IGT APAC Manufacturing Operations · <strong>DV50</strong></div>
   </div>
 </div>
 
@@ -572,9 +572,19 @@ footer{text-align:center;padding:1.5rem;font-size:11px;color:var(--text3);border
           </div>
           <div class="card" style="margin-top:1rem">
             <div class="card-section-header">📧 Scheduled Timesheet Reports</div>
-            <div style="font-size:12px;color:var(--text2);margin-bottom:.75rem">Configure automatic daily timesheet emails. Add multiple recipients — each can receive reports for specific areas and staff types.</div>
+            <div style="font-size:12px;color:var(--text2);margin-bottom:.75rem">Configure automatic daily timesheet emails.</div>
             <div id="report-schedules-list"></div>
             <button class="btn btn-primary" style="margin-top:.5rem" onclick="openScheduleModal()">+ Add Report Schedule</button>
+          </div>
+          <div class="card" style="margin-top:1rem">
+            <div class="card-section-header">🗑 Attendance Entry Management</div>
+            <div style="font-size:12px;color:var(--text2);margin-bottom:.75rem">View and discard incorrect clock entries for any date.</div>
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:.75rem;flex-wrap:wrap">
+              <input type="date" id="manage-date" style="padding:8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px"/>
+              <button class="btn btn-primary" onclick="loadManageEntries()">🔍 Load entries</button>
+              <button class="btn" onclick="document.getElementById('manage-date').value=today();loadManageEntries()">Today</button>
+            </div>
+            <div id="manage-entries-wrap"></div>
           </div>
           <div class="card" style="margin-top:1rem">
             <div class="card-section-header">📋 Version History</div>
