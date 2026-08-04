@@ -1648,8 +1648,31 @@ function closeGeoBlockModal() {
 }
 
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV50";
+const APP_VERSION = "DV52";
 const VERSION_HISTORY = [
+  {
+    version: "DV52",
+    date: "2026-08-04",
+    status: "current",
+    changes: [
+      "Migrated from SharePoint Excel to SharePoint Lists for attendance and employees",
+      "Clock in creates SharePoint List item and saves item ID locally",
+      "Clock out updates existing item — no more duplicate rows",
+      "Employee sync now reads from TimeTrack_Employees SharePoint List",
+      "Employee save writes to TimeTrack_Employees SharePoint List",
+      "New Power Automate flows: Attendance List and Employees List",
+    ]
+  },
+  {
+    version: "DV51",
+    date: "2026-08-04",
+    status: "current",
+    changes: [
+      "App now saves SharePoint row ID when clock in is recorded",
+      "Clock out sends row ID to Power Automate for exact row update",
+      "Eliminates duplicate rows — clock out updates existing clock in row",
+    ]
+  },
   {
     version: "DV50",
     date: "2026-08-04",
@@ -2862,7 +2885,7 @@ async function spPullAll(silent = false) {
 
 
 // ── Power Automate — Read Employees from SharePoint Excel ─────
-const PA_READ_EMPLOYEES_URL = "https://default3c259ff8b3a9490ca23979b422db62.eb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/1fe9cf12e6a7440d8f944cb5df1d039f/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=DKwDvj_WjJjbDQBxEerLQRbhIqS8K79hlOeVfyUNp1I";
+const PA_READ_EMPLOYEES_URL = "https://default3c259ff8b3a9490ca23979b422db62.eb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/56975b038c324ba68e2e0b96de7ae820/triggers/manual/paths/invoke?api-version=1";
 
 async function syncEmployeesFromSharePoint(silent = false) {
   if (!PA_READ_EMPLOYEES_URL) return;
@@ -2885,31 +2908,32 @@ async function syncEmployeesFromSharePoint(silent = false) {
 
     // Map Excel columns to app employee format
     // Debug — log first row column names to console
-    if (rows.length) console.log("[PA Employees] Column names:", Object.keys(rows[0]));
+    if (rows.length) console.log("[SP List Employees] Column names:", Object.keys(rows[0]));
 
     const synced = rows.map(r => {
-      const name = r["Employee Name"] || r.EmployeeName || r.Title || "";
+      // SharePoint List uses Title for name
+      const name = r.Title || r["Employee Name"] || r.EmployeeName || "";
       if (!name) return null;
       const stableKey = nameToKey(name);
 
-      // Try all possible column name variations for time fields
-      const rawStart = r["Std Start"] || r["StdStart"] || r["Std_Start"] || r["startTime"] || r["StartTime"] || "";
-      const rawEnd   = r["Std End"]   || r["StdEnd"]   || r["Std_End"]   || r["endTime"]   || r["EndTime"]   || "";
+      // SharePoint List column names (as created in the list)
+      const rawStart = r.StartTime || r["Std Start"] || r["StdStart"] || "";
+      const rawEnd   = r.EndTime   || r["Std End"]   || r["StdEnd"]   || "";
 
-      console.log(`[PA Employees] ${name} — rawStart: "${rawStart}" rawEnd: "${rawEnd}"`);
+      console.log(`[SP List Employees] ${name} — start: "${rawStart}" end: "${rawEnd}"`);
 
       return {
         key:       stableKey,
         name,
         empId:     r.EmployeeID   || r["Employee ID"] || "",
-        area:      r["Work Area"] || r.Area || r.WorkArea || "",
-        status:    r["Employment Status"] || r.Status || r.EmploymentStatus || "Permanent",
+        area:      r.Area         || r["Work Area"]   || r.WorkArea || "",
+        status:    r.EmpStatus    || r["Employment Status"] || r.EmploymentStatus || "Permanent",
         startTime: formatTimeStr(rawStart) || "07:00",
         endTime:   formatTimeStr(rawEnd)   || "15:30",
-        hours:     parseFloat(r["Hours Per Day"] || r.HoursPerDay || 8),
-        lunchMins: parseInt(r["Lunch Break (min)"] || r.LunchMins || 30),
+        hours:     parseFloat(r.HoursPerDay || r["Hours Per Day"] || 8),
+        lunchMins: parseInt(r.LunchMins || r["Lunch Break (min)"] || 30),
         pin:       r.PIN || "0000",
-        faceDescriptor: r.FaceData ? JSON.parse(r.FaceData) : null,
+        faceDescriptor: null,
       };
     }).filter(e => e && e.name);
 
@@ -2972,8 +2996,8 @@ async function saveEmployeeToSharePoint(emp) {
   }
 }
 
-// ── Power Automate — Write to SharePoint Excel ────────────────
-const PA_EXCEL_URL = "https://default3c259ff8b3a9490ca23979b422db62.eb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/bff81414b8ef4af683e7f907f576389c/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=QqzFgS4fbuNMcAq04YeQZUk3HSnIkQB1k3zqleTqZHo";
+// ── Power Automate — SharePoint List Attendance ──────────────────
+const PA_EXCEL_URL = "https://default3c259ff8b3a9490ca23979b422db62.eb.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/1756b4dffe0b4327a71bbda11a1ba967/triggers/manual/paths/invoke?api-version=1";
 
 async function writeClockEntryToExcel(entry) {
   const actual  = calcHours(entry.timeIn, entry.timeOut, entry.lunchMins);
@@ -2984,25 +3008,27 @@ async function writeClockEntryToExcel(entry) {
     ? (diff !== null && diff >= 0 ? "On time" : "Short hours")
     : entry.timeIn ? "In progress" : "Absent";
 
-  // Ensure all time values are HH:MM strings — Excel sometimes converts to decimals
+  const isClockin = !entry.timeOut;
+
   const payload = {
-    action:     entry.timeOut ? "clockout" : "clockin",
-    empKey:     entry.empKey     || "",
-    empName:    entry.name       || "",
-    empId:      entry.empId      || "",
-    area:       entry.area       || "",
-    date:       entry.date       || "",
-    timeIn:     formatTimeStr(entry.timeIn)    || "",
-    timeOut:    formatTimeStr(entry.timeOut)   || "",
-    stdStart:   formatTimeStr(entry.stdStart)  || "",
-    stdEnd:     formatTimeStr(entry.stdEnd)    || "",
-    stdHours:   entry.stdHours   || 8,
-    lunchMins:  entry.lunchMins  || 0,
-    status:     entry.status     || "Permanent",
-    startVariance: inVar,
-    endVariance:   outVar,
-    netHours:      actual !== null ? +actual.toFixed(2) : 0,
-    difference:    diff !== null ? diff : 0,
+    action:           isClockin ? "clockin" : "clockout",
+    itemId:           entry.spItemId || 0,
+    empKey:           entry.empKey     || "",
+    empName:          entry.name       || "",
+    empId:            entry.empId      || "",
+    area:             entry.area       || "",
+    date:             entry.date       || "",
+    timeIn:           formatTimeStr(entry.timeIn)    || "",
+    timeOut:          formatTimeStr(entry.timeOut)   || "",
+    stdStart:         formatTimeStr(entry.stdStart)  || "",
+    stdEnd:           formatTimeStr(entry.stdEnd)    || "",
+    stdHours:         entry.stdHours   || 8,
+    lunchMins:        entry.lunchMins  || 0,
+    status:           entry.status     || "Permanent",
+    startVariance:    inVar,
+    endVariance:      outVar,
+    netHours:         actual !== null ? +actual.toFixed(2) : 0,
+    difference:       diff !== null ? diff : 0,
     attendanceStatus: status,
   };
 
@@ -3013,14 +3039,32 @@ async function writeClockEntryToExcel(entry) {
       body: JSON.stringify(payload),
     });
     if (resp.ok || resp.status === 202) {
-      console.log("[PA Excel] ✓ Written to SharePoint Excel:", entry.name, entry.timeIn || entry.timeOut);
+      if (isClockin) {
+        try {
+          const result = await resp.json();
+          const spId = result?.id || result?.ID || null;
+          if (spId) {
+            const idx = clockEntries.findIndex(e =>
+              e.empKey === entry.empKey && e.date === entry.date && e.timeIn === entry.timeIn
+            );
+            if (idx >= 0) {
+              clockEntries[idx].spItemId = spId;
+              saveLocal();
+              console.log("[SP List] ✓ Clock in saved — item ID:", spId);
+            }
+          }
+        } catch(e) { console.warn("[SP List] Could not parse response:", e.message); }
+      } else {
+        console.log("[SP List] ✓ Clock out updated — item ID:", entry.spItemId);
+      }
       setSyncStatus("Synced " + new Date().toLocaleTimeString("en-AU", { hour:"2-digit", minute:"2-digit" }));
     } else {
-      console.warn("[PA Excel] ✗ Failed:", resp.status, await resp.text());
+      const errText = await resp.text();
+      console.warn("[SP List] ✗ Failed:", resp.status, errText);
       setSyncStatus("Sync failed");
     }
   } catch(e) {
-    console.warn("[PA Excel] ✗ Network error:", e.message);
+    console.warn("[SP List] ✗ Network error:", e.message);
     setSyncStatus("Offline — saved locally");
   }
 }
