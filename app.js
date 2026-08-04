@@ -1576,8 +1576,18 @@ function closeGeoBlockModal() {
 }
 
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV46";
+const APP_VERSION = "DV47";
 const VERSION_HISTORY = [
+  {
+    version: "DV47",
+    date: "2026-08-04",
+    status: "current",
+    changes: [
+      "Added debug logging to show exact column names from SharePoint employee sync",
+      "Handle all possible column name variations for Std Start and Std End",
+      "formatTimeStr applied to all time field variations from SharePoint",
+    ]
+  },
   {
     version: "DV46",
     date: "2026-08-04",
@@ -2775,18 +2785,31 @@ async function syncEmployeesFromSharePoint(silent = false) {
       const name = r["Employee Name"] || r.EmployeeName || "";
       if (!name) return null;
       // Generate stable key from name — same name always gets same key
+      // Debug — log first row to see exact column names
+      if (rows.length) console.log("[PA Employees] Column names:", Object.keys(rows[0]));
+
+      const synced = rows.map(r => {
+      const name = r["Employee Name"] || r.EmployeeName || r.Title || "";
+      if (!name) return null;
       const stableKey = nameToKey(name);
+
+      // Try all possible column name variations for time fields
+      const rawStart = r["Std Start"] || r["StdStart"] || r["Std_Start"] || r["startTime"] || r["StartTime"] || "";
+      const rawEnd   = r["Std End"]   || r["StdEnd"]   || r["Std_End"]   || r["endTime"]   || r["EndTime"]   || "";
+
+      console.log(`[PA Employees] ${name} — rawStart: "${rawStart}" rawEnd: "${rawEnd}"`);
+
       return {
         key:       stableKey,
         name,
-        empId:     r.EmployeeID   || "",
-        area:      r["Work Area"] || r.Area || "",
-        status:    r["Employment Status"] || r.Status || "Permanent",
-        startTime: formatTimeStr(r["Std Start"] || r.StartTime) || "07:00",
-        endTime:   formatTimeStr(r["Std End"]   || r.EndTime)   || "15:30",
+        empId:     r.EmployeeID   || r["Employee ID"] || "",
+        area:      r["Work Area"] || r.Area || r.WorkArea || "",
+        status:    r["Employment Status"] || r.Status || r.EmploymentStatus || "Permanent",
+        startTime: formatTimeStr(rawStart) || "07:00",
+        endTime:   formatTimeStr(rawEnd)   || "15:30",
         hours:     parseFloat(r["Hours Per Day"] || r.HoursPerDay || 8),
         lunchMins: parseInt(r["Lunch Break (min)"] || r.LunchMins || 30),
-        pin:       r.PIN          || "0000",
+        pin:       r.PIN || "0000",
         faceDescriptor: r.FaceData ? JSON.parse(r.FaceData) : null,
       };
     }).filter(e => e && e.name);
