@@ -881,26 +881,45 @@ function calcStdHours(start, end) {
 
 function parseImportFile(buffer) {
   let wb;
-  try { wb = XLSX.read(buffer, { type:"array" }); }
+  try { wb = XLSX.read(buffer, { type:"array", cellDates: false }); }
   catch(e) { toast("Could not read file: " + e.message, "error"); return; }
 
   const ws = wb.Sheets[wb.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(ws, { defval:"" });
+  const rows = XLSX.utils.sheet_to_json(ws, { defval:"", raw: true });
 
   const errors = [], parsed = [];
   const seenNames = new Set(), seenIds = new Set();
 
+  // Helper to safely read and format time from Excel cell
+  // Handles both string "07:00" and decimal 0.2917 (Excel time format)
+  function readTime(val) {
+    if (!val && val !== 0) return "";
+    const s = val.toString().trim();
+    // Already HH:MM format
+    if (/^\d{1,2}:\d{2}$/.test(s)) return s;
+    // Excel decimal time e.g. 0.541666
+    const num = parseFloat(s);
+    if (!isNaN(num) && num >= 0 && num < 1) return formatTimeStr(num);
+    return s;
+  }
+
   rows.forEach((row, idx) => {
     const rowNum = idx + 2;
-    const name   = (row["Employee Name"] || row["Name"] || "").toString().trim();
+    const name = (row["Employee Name"] || row["Name"] || "").toString().trim();
+
+    // Skip legend, REQUIRED label rows and empty rows
+    if (!name ||
+        name.toLowerCase().includes("full name") ||
+        name.toLowerCase() === "required" ||
+        name.toLowerCase() === "optional") return;
     const area   = (row["Area"] || row["Work Area"] || "").toString().trim();
     const empStatus = (row["Employment Status"] || row["Status"] || "").toString().trim();
     const status = empStatus || "Permanent";
     // Support both old format (Mon-Thu as range) and new format (separate columns)
-    const monThuStart = (row["Mon-Thu Start"] || row["Start Time"] || row["Start"] || "").toString().trim();
-    const monThuEnd   = (row["Mon-Thu End"]   || row["End Time"]   || row["End"]   || "").toString().trim();
-    const friStart    = (row["Friday Start"]  || monThuStart).toString().trim();
-    const friEnd      = (row["Friday End"]    || monThuEnd).toString().trim();
+    const monThuStart = readTime(row["Mon-Thu Start"] || row["Start Time"] || row["Start"] || "");
+    const monThuEnd   = readTime(row["Mon-Thu End"]   || row["End Time"]   || row["End"]   || "");
+    const friStart    = readTime(row["Friday Start"]  || "") || monThuStart;
+    const friEnd      = readTime(row["Friday End"]    || "") || monThuEnd;
 
     // Legacy support — "Monday to Thursday" as HH:MM-HH:MM range
     const monThuLegacy = (row["Monday to Thursday"] || row["Mon-Thu"] || row["Shift"] || "").toString().trim();
@@ -1749,8 +1768,19 @@ async function pushAllEmployeesToSharePoint() {
 }
 
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV59";
+const APP_VERSION = "DV60";
 const VERSION_HISTORY = [
+  {
+    version: "DV60",
+    date: "2026-08-05",
+    status: "current",
+    changes: [
+      "Fixed import skipping legend and REQUIRED label rows",
+      "Fixed Friday End decimal time — Excel h:mm format now converted to HH:MM",
+      "readTime() helper handles both string and decimal time formats from Excel",
+      "Import now reads raw cell values to prevent Excel auto-conversion",
+    ]
+  },
   {
     version: "DV59",
     date: "2026-08-05",
