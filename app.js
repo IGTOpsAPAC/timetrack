@@ -894,14 +894,14 @@ function parseImportFile(buffer) {
     const rowNum = idx + 2;
     const name   = (row["Employee Name"] || row["Name"] || "").toString().trim();
     const area   = (row["Area"] || row["Work Area"] || "").toString().trim();
+    const empStatus = (row["Employment Status"] || row["Status"] || "").toString().trim();
     const status = empStatus || "Permanent";
     const monThu = (row["Monday to Thursday"] || row["Mon-Thu"] || row["Shift"] || "").toString().trim();
     const friday = (row["Friday"] || monThu).toString().trim();
 
-    if (!name)   { errors.push(`Row ${rowNum}: Missing employee name`); return; }
-    if (!area)   { errors.push(`Row ${rowNum}: Missing area for "${name}"`); return; }
-    if (!monThu) { errors.push(`Row ${rowNum}: Missing Monday-Thursday shift for "${name}"`); return; }
-    const empStatus = (row["Employment Status"] || row["Status"] || "").toString().trim();
+    if (!name)      { errors.push(`Row ${rowNum}: Missing employee name`); return; }
+    if (!area)      { errors.push(`Row ${rowNum}: Missing area for "${name}"`); return; }
+    if (!monThu)    { errors.push(`Row ${rowNum}: Missing Monday-Thursday shift for "${name}"`); return; }
     if (!empStatus) { errors.push(`Row ${rowNum}: Missing employment status for "${name}"`); return; }
 
     const nameKey = name.toLowerCase();
@@ -1734,8 +1734,17 @@ async function pushAllEmployeesToSharePoint() {
 }
 
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV57";
+const APP_VERSION = "DV58";
 const VERSION_HISTORY = [
+  {
+    version: "DV58",
+    date: "2026-08-05",
+    status: "current",
+    changes: [
+      "Fixed Import Excel crash — empStatus variable used before declaration",
+      "Import function now correctly validates all required fields",
+    ]
+  },
   {
     version: "DV57",
     date: "2026-08-05",
