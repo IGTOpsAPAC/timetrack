@@ -896,23 +896,38 @@ function parseImportFile(buffer) {
     const area   = (row["Area"] || row["Work Area"] || "").toString().trim();
     const empStatus = (row["Employment Status"] || row["Status"] || "").toString().trim();
     const status = empStatus || "Permanent";
-    const monThu = (row["Monday to Thursday"] || row["Mon-Thu"] || row["Shift"] || "").toString().trim();
-    const friday = (row["Friday"] || monThu).toString().trim();
+    // Support both old format (Mon-Thu as range) and new format (separate columns)
+    const monThuStart = (row["Mon-Thu Start"] || row["Start Time"] || row["Start"] || "").toString().trim();
+    const monThuEnd   = (row["Mon-Thu End"]   || row["End Time"]   || row["End"]   || "").toString().trim();
+    const friStart    = (row["Friday Start"]  || monThuStart).toString().trim();
+    const friEnd      = (row["Friday End"]    || monThuEnd).toString().trim();
+
+    // Legacy support — "Monday to Thursday" as HH:MM-HH:MM range
+    const monThuLegacy = (row["Monday to Thursday"] || row["Mon-Thu"] || row["Shift"] || "").toString().trim();
+    let startTime = monThuStart, endTime = monThuEnd;
+    if (!startTime && !endTime && monThuLegacy) {
+      const parsed = parseTime(monThuLegacy);
+      if (parsed) { startTime = parsed[0]; endTime = parsed[1]; }
+    }
 
     if (!name)      { errors.push(`Row ${rowNum}: Missing employee name`); return; }
     if (!area)      { errors.push(`Row ${rowNum}: Missing area for "${name}"`); return; }
-    if (!monThu)    { errors.push(`Row ${rowNum}: Missing Monday-Thursday shift for "${name}"`); return; }
     if (!empStatus) { errors.push(`Row ${rowNum}: Missing employment status for "${name}"`); return; }
+
+    if (!startTime) { errors.push(`Row ${rowNum}: Missing Mon-Thu Start time for "${name}"`); return; }
+    if (!endTime)   { errors.push(`Row ${rowNum}: Missing Mon-Thu End time for "${name}"`); return; }
+
+    // Validate time format HH:MM
+    const timeRx = /^\d{1,2}:\d{2}$/;
+    if (!timeRx.test(startTime)) { errors.push(`Row ${rowNum}: Invalid Mon-Thu Start "${startTime}" — use HH:MM format e.g. 07:00`); return; }
+    if (!timeRx.test(endTime))   { errors.push(`Row ${rowNum}: Invalid Mon-Thu End "${endTime}" — use HH:MM format e.g. 15:30`); return; }
 
     const nameKey = name.toLowerCase();
     if (seenNames.has(nameKey)) { errors.push(`Row ${rowNum}: Duplicate in file — "${name}"`); return; }
     seenNames.add(nameKey);
 
-    const monThuTimes = parseTime(monThu);
-    if (!monThuTimes || !monThuTimes[0] || !monThuTimes[1]) {
-      errors.push(`Row ${rowNum}: Cannot parse shift time "${monThu}" for "${name}"`); return;
-    }
-    const friTimes = parseTime(friday);
+    const monThuTimes = [startTime, endTime];
+    const friTimes = [friStart, friEnd];
 
     // Auto-generate employee ID
     const parts = name.replace(/,/g,"").split(/\s+/);
@@ -1734,8 +1749,20 @@ async function pushAllEmployeesToSharePoint() {
 }
 
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV58";
+const APP_VERSION = "DV59";
 const VERSION_HISTORY = [
+  {
+    version: "DV59",
+    date: "2026-08-05",
+    status: "current",
+    changes: [
+      "Import template redesigned — separate columns for Mon-Thu Start, Mon-Thu End, Friday Start, Friday End",
+      "Import parser updated to read separate time columns",
+      "Legacy format (HH:MM-HH:MM range) still supported for backward compatibility",
+      "Time format validated as HH:MM before import",
+      "Area and Employment Status dropdowns in template",
+    ]
+  },
   {
     version: "DV58",
     date: "2026-08-05",
