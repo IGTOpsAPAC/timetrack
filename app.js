@@ -60,7 +60,7 @@ function loadLocal() {
   settings = JSON.parse(localStorage.getItem("tt_settings") || "{}");
   if (!employees.length && !Object.keys(settings).length) {
     // Only reset settings if truly first run (no settings at all)
-    settings = { adminPin:"0000", areas:"Gaming Assembly,Fintech Assembly,Repair Centre,Warehouse,Operations Support", company:"IGT APAC Manufacturing", recipientName:"Operations Manager", recipientEmail:"manager@igt.com", siteName:"APACManufacturingOperationsTeam", filePath:"General/ATTENDANCE/Attendance.xlsx", defaultLunch:30 };
+    settings = { adminPin:"0000", areas:"Gaming Production,FinTech Production,Warehouse,Assembly", company:"IGT APAC Manufacturing", recipientName:"Operations Manager", recipientEmail:"manager@igt.com", siteName:"APACManufacturingOperationsTeam", filePath:"General/ATTENDANCE/Attendance.xlsx", defaultLunch:30 };
     saveLocal();
   }
 }
@@ -587,7 +587,7 @@ function renderEmpList() {
 
 function openEmpModal(key) {
   editingEmpKey=key||null;
-  const areas=(settings.areas||"Gaming Assembly,Fintech Assembly,Repair Centre,Warehouse,Operations Support").split(",").map(a=>a.trim());
+  const areas=(settings.areas||"Gaming Production,FinTech Production,Warehouse,Assembly").split(",").map(a=>a.trim());
   document.getElementById("emp-area").innerHTML=areas.map(a=>`<option>${a}</option>`).join("");
   window._pendingFaceDescriptor = null;
   window._clearFaceDescriptor = false;
@@ -894,13 +894,15 @@ function parseImportFile(buffer) {
     const rowNum = idx + 2;
     const name   = (row["Employee Name"] || row["Name"] || "").toString().trim();
     const area   = (row["Area"] || row["Work Area"] || "").toString().trim();
-    const status = (row["Employment Status"] || row["Status"] || "Permanent").toString().trim();
+    const status = empStatus || "Permanent";
     const monThu = (row["Monday to Thursday"] || row["Mon-Thu"] || row["Shift"] || "").toString().trim();
     const friday = (row["Friday"] || monThu).toString().trim();
 
     if (!name)   { errors.push(`Row ${rowNum}: Missing employee name`); return; }
     if (!area)   { errors.push(`Row ${rowNum}: Missing area for "${name}"`); return; }
-    if (!monThu) { errors.push(`Row ${rowNum}: Missing shift time for "${name}"`); return; }
+    if (!monThu) { errors.push(`Row ${rowNum}: Missing Monday-Thursday shift for "${name}"`); return; }
+    const empStatus = (row["Employment Status"] || row["Status"] || "").toString().trim();
+    if (!empStatus) { errors.push(`Row ${rowNum}: Missing employment status for "${name}"`); return; }
 
     const nameKey = name.toLowerCase();
     if (seenNames.has(nameKey)) { errors.push(`Row ${rowNum}: Duplicate in file — "${name}"`); return; }
@@ -1732,8 +1734,28 @@ async function pushAllEmployeesToSharePoint() {
 }
 
 // ── Version History ───────────────────────────────────────────
-const APP_VERSION = "DV55";
+const APP_VERSION = "DV57";
 const VERSION_HISTORY = [
+  {
+    version: "DV57",
+    date: "2026-08-05",
+    status: "current",
+    changes: [
+      "Import template — Area dropdown: Gaming Production, FinTech Production, Warehouse, Assembly",
+      "Import template — Employment Status dropdown: Permanent, Contractor",
+      "Updated default work areas in app to match new area names",
+    ]
+  },
+  {
+    version: "DV56",
+    date: "2026-08-05",
+    status: "current",
+    changes: [
+      "Import template updated — PIN removed, all fields now required",
+      "Import validation now requires Employment Status field",
+      "Employee import template updated with 5 columns only",
+    ]
+  },
   {
     version: "DV55",
     date: "2026-08-04",
